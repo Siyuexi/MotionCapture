@@ -1,19 +1,19 @@
 # train
 
-import matplotlib.pyplot as plt
 from torchvision import transforms,datasets
-from torch import device,cuda,max,nn,optim,save,no_grad,load
+from torch import device,cuda,nn,optim,no_grad
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import sys
 
-from model.Extractor import Extractor
+from utils.examples import ExtractNet
+from utils.tools import accurate_count,selective_load,complete_save,learning_draw
 
 num_epochs = 3
 batch_size = 16
 img_size =256
 
-model_name = "extractor-3"
+model_name = "extractor-pretrain"
 log = open('log/'+model_name+'.txt','wt')
 
 transform = transforms.Compose([transforms.Resize((img_size,img_size)),transforms.ToTensor()])
@@ -42,22 +42,15 @@ device = device("cuda" if cuda.is_available() else "cpu")
 print("device : "+str(device),file=log,flush=True)
 print("device : "+str(device),file=sys.stdout)
 
-def accuracy(predictions, labels):
-    
-    pred = max(predictions.data, 1)[1] 
-    right_num = pred.eq(labels.data.view_as(pred)).sum() 
-    return right_num, len(labels)
-
-model = Extractor(img_size)
-model = nn.Sequential(model,nn.Linear(512,10))
+model = ExtractNet(img_size)
 # print(model)
 model = model.to(device)
-# model.load_state_dict("weights/"+model_name+'-epoch-'+str(num_epochs)+".pth") # load last state (if any)
-model.load_state_dict(load("weights/"+"extractor-2"+'-epoch-'+"2"+".pth"))
 
 best_model_wts = model.state_dict()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(),lr=0.01,momentum=0.9)
+
+model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"2"+".pth",True)
 
 err_record = []
 best_acc_r = 1
@@ -80,7 +73,7 @@ for epoch in range(num_epochs):
         loss.backward()
         optimizer.step()
         
-        accuracies = accuracy(output, label)
+        accuracies = accurate_count(output, label)
         train_accuracy.append(accuracies)
         
         if batch_id%100 ==0: 
@@ -95,7 +88,7 @@ for epoch in range(num_epochs):
 
                 output = model(data) 
 
-                accuracies = accuracy(output, label) 
+                accuracies = accurate_count(output, label) 
                 val_accuracy.append(accuracies)
                 
             train_r = (sum([tup[0] for tup in train_accuracy]), sum([tup[1] for tup in train_accuracy]))
@@ -115,16 +108,9 @@ for epoch in range(num_epochs):
                 best_acc_r = val_acc_r
                 best_model_wts = model.state_dict()
             err_record.append((100 - train_acc_r.cpu(), 100 - val_acc_r.cpu()))
-    save(best_model_wts,"weights/"+model_name+'-epoch-'+str(epoch)+".pth")
+    complete_save(best_model_wts,optimizer.state_dict(),"weights/"+model_name+'-epoch-'+str(epoch)+".pth")
 
-plt.figure(figsize = (10,7))
-plt.plot(err_record)
-plt.xlabel('Steps')
-plt.ylabel('Error rate(%)')
-plt.show()
-plt.save("log/"+model_name+".pdf")
-
-save(best_model_wts, "weights/"+model_name+".pth")
+learning_draw("log/"+model_name+".pdf",err_record)
 
 model.eval() 
 test_accuracy = [] 
@@ -134,7 +120,7 @@ with no_grad():
         data = data.to(device)
         label = label.to(device)        
         output = model(data)        
-        accuracies = accuracy(output,label)
+        accuracies = accurate_count(output,label)
         test_accuracy.append(accuracies)
         
 rights = (sum([tup[0] for tup in test_accuracy]), sum([tup[1] for tup in test_accuracy]))

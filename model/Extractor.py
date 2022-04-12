@@ -46,7 +46,6 @@ class Extractor(nn.Module):
         self.conv2 = nn.Conv2d(32,64,kernel_size=3,stride=2,padding=1)
         self.blocks = nn.ModuleList([ResidualBlock(64*(2**int(i/2)))for i in range(self.block_num)])
         self.samplings = nn.ModuleList([nn.Conv2d(64*(2**i),64*(2**(i+1)),kernel_size=3,stride=2,padding=1)for i in range(int(self.block_num/2)-1)])
-        self.avgpooling = nn.AdaptiveAvgPool2d((1,1))
 
 
     def forward(self,x):
@@ -57,9 +56,4 @@ class Extractor(nn.Module):
             x = self.blocks[i*2+1](x)
             x = self.samplings[i](x)
         x = self.blocks[self.block_num-1](x)
-        # print(x.size())
-        x = self.avgpooling(x)
-        # print(x.size())
-        x = x.view(x.size(0),-1) # reshape tensor to [batch_size,feature_tensor]
-        # print(x.size()) 
         return x
