@@ -6,8 +6,8 @@ from GestaltNet import GestaltNet
 
 
 class ExtractNet(GestaltNet):
-    def __init__(self,img_size) -> None:
-        super().__init__(img_size)
+    def __init__(self) -> None:
+        super().__init__()
         self.avgpooling = nn.AdaptiveAvgPool2d((1,1))
         self.fc = nn.Linear(512,10)
 
@@ -20,8 +20,8 @@ class ExtractNet(GestaltNet):
 
 
 class GeneratNet(GestaltNet):
-    def __init__(self,img_size) -> None:
-        super().__init__(img_size)
+    def __init__(self) -> None:
+        super().__init__()
         self.avgpooling = nn.AdaptiveAvgPool2d((1,1))
         self.fc = nn.Linear(512,10)
 
@@ -36,8 +36,8 @@ class GeneratNet(GestaltNet):
 
 
 class SegmentNet(GestaltNet):
-    def __init__(self,img_size) -> None:
-        super().__init__(img_size)
+    def __init__(self) -> None:
+        super().__init__()
         self.avgpooling = nn.AdaptiveAvgPool2d((1,1))
         self.fc = nn.Linear(512,10)
 

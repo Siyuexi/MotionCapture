@@ -37,9 +37,8 @@ class ResidualBlock(nn.Module):
 
 # general feature extractor backbone
 class Extractor(nn.Module):
-    def __init__(self,img_size,block_num=8) -> None:
+    def __init__(self,block_num=8) -> None:
         super().__init__()
-        self.img_size= img_size
         self.block_num=block_num
 
         self.conv1 = nn.Conv2d(3,32,kernel_size=3,stride=1,padding=1)

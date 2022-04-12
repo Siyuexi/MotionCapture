@@ -9,7 +9,7 @@ import sys
 from utils.examples import ExtractNet
 from utils.tools import accurate_count,selective_load,complete_save,learning_draw
 
-num_epochs = 3
+num_epochs = 5
 batch_size = 16
 img_size =256
 
@@ -42,7 +42,7 @@ device = device("cuda" if cuda.is_available() else "cpu")
 print("device : "+str(device),file=log,flush=True)
 print("device : "+str(device),file=sys.stdout)
 
-model = ExtractNet(img_size)
+model = ExtractNet()
 # print(model)
 model = model.to(device)
 
@@ -50,7 +50,7 @@ best_model_wts = model.state_dict()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(),lr=0.01,momentum=0.9)
 
-model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"2"+".pth",True)
+model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"4"+".pth",True)
 
 err_record = []
 best_acc_r = 1
@@ -110,7 +110,7 @@ for epoch in range(num_epochs):
             err_record.append((100 - train_acc_r.cpu(), 100 - val_acc_r.cpu()))
     complete_save(best_model_wts,optimizer.state_dict(),"weights/"+model_name+'-epoch-'+str(epoch)+".pth")
 
-learning_draw("log/"+model_name+".pdf",err_record)
+learning_draw(model_name,err_record)
 
 model.eval() 
 test_accuracy = [] 
