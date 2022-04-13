@@ -40,13 +40,16 @@ def learning_draw(model_name,error_rate):
     plt.show()
     fig.savefig("log/"+model_name+".pdf")
 
-def anchor_create():
+def anchor_create(size_num,ratio_num):
     pass
 
 def region_split():
     pass
 
 def pose_estimate():
+    pass
+
+def bbox_calculate(anchor,shift):
     pass
 
 def IoU_calculate(box1,box2,threshold=0.5,device='cuda'): # device could not be cuda on Android 
