@@ -50,7 +50,7 @@ best_model_wts = model.state_dict()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(),lr=0.01,momentum=0.9)
 
-model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"4"+".pth",True)
+model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"4"+".pth")
 
 err_record = []
 best_acc_r = 1
