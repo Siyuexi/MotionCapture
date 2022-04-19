@@ -1,6 +1,8 @@
 # some tool functions
-from torch import load,save,max,min,zeros,is_tensor
+from torch import load,save,max,min,zeros,is_tensor,from_numpy
+from torchvision.ops import nms
 import matplotlib.pyplot as plt
+import numpy as np
 
 def selective_load(model,optimizer,checkpoint_path,need_optim=False):
     model_state_dict = model.state_dict()
@@ -40,19 +42,61 @@ def learning_draw(model_name,error_rate):
     plt.show()
     fig.savefig("log/"+model_name+".pdf")
 
-def anchor_create(size_num,ratio_num):
-    pass
+def unmap(data,count,index,fill=0):
+    if len(data.shape) == 1:
+        ret = np.empty((count,), dtype=data.dtype)
+        ret.fill(fill)
+        ret[index] = data
+    else:
+        ret = np.empty((count,)+data.shape[1:],dtype=data.dtype)
+        ret.fill(fill)
+        ret[index,:]=data
+    return ret
 
-def region_split():
-    pass
+def shift_calculate(anchor,gt): # for self-defined pre-training on Segmentor
+    # anchor:[xmin,ymin,xmax,ymax] ==> [xcenter,ycenter,w,h] 
+    ah = anchor[:,2] - anchor[:,0]
+    aw = anchor[:,3] - anchor[:,1]
+    ay = anchor[:,0] + 0.5*ah
+    ax = anchor[:,1] + 0.5*aw
 
-def pose_estimate():
-    pass
+    # gt:[xmin,ymin,xmax,ymax] ==> [x,y,w,h]
+    th = gt[:,2] - gt[:,0]
+    tw = gt[:,3] - gt[:,1]
+    ty = gt[:,0] + 0.5*th
+    tx = gt[:,1] + 0.5*tw 
+
+    # get a very small number eps to avoid "/0" exception
+    eps = np.finfo(ah.dtype).eps
+    h = np.maximum(ah,eps)
+    w = np.maximum(aw,eps)
+
+    dy = (ty-ay)/h
+    dx = (tx-ax)/w
+    dh = np.log(th/h)
+    dw = np.log(tw/w)
+
+    shift = np.vstack((dy,dx,dh,dw)).transpose()
+
+    return shift
 
 def bbox_calculate(anchor,shift):
-    pass
+    # anchor:[xmin,ymin,xmax,ymax] ==> [xcenter,ycenter,w,h] 
+    ah = anchor[:,2] - anchor[:,0]
+    aw = anchor[:,3] - anchor[:,1]
+    ay = anchor[:,0] + 0.5*ah
+    ax = anchor[:,1] + 0.5*aw
 
-def IoU_calculate(box1,box2,threshold=0.5,device='cuda'): # device could not be cuda on Android 
+    bx = ax + aw*shift[:,0]
+    by = ay + ah*shift[:,1]
+    bw = aw*np.exp(shift[:,2])
+    bh = ah*np.exp(shift[:,3])
+
+    bbox = np.vstack((bx,by,bx,bh)).transpose()
+
+    return bbox
+
+def IoU_calculate(box1,box2,threshold=0.5,type=0): # type==0:find those who >= threshold; type==1:find those who <=threshold;else do not calculate acc
     b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
     b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
 
@@ -61,17 +105,197 @@ def IoU_calculate(box1,box2,threshold=0.5,device='cuda'): # device could not be 
     inter_rect_x2 = min(b1_x2, b2_x2)
     inter_rect_y2 = min(b1_y2, b2_y2)
 
-    inter_area = max(inter_rect_x2 - inter_rect_x1 + 1, zeros(inter_rect_x2.shape).to(device)) * max(
-        inter_rect_y2 - inter_rect_y1 + 1, zeros(inter_rect_x2.shape).to(device))
+    inter_area = max(inter_rect_x2 - inter_rect_x1 + 1, zeros(inter_rect_x2.shape)) * max(
+        inter_rect_y2 - inter_rect_y1 + 1, zeros(inter_rect_x2.shape))
 
     b1_area = (b1_x2 - b1_x1 + 1) * (b1_y2 - b1_y1 + 1)
     b2_area = (b2_x2 - b2_x1 + 1) * (b2_y2 - b2_y1 + 1)
 
     iou = inter_area / (b1_area + b2_area - inter_area)
     
-    right_num = sum(i >= threshold for i in iou)
+    if(type==0):
+        num = sum(i >= threshold for i in iou)
+    elif(type==1):
+        num = sum(i <= threshold for i in iou)
+    else:
+        return iou
 
-    return right_num, len(iou)
+    return iou,num,len(iou)
+
+def anchor_create(img_size,num_backboneblocks,anchor_params): # anchor_params == 9 or 16
+    # type of anchor coordinates : Numpy (not Tensor)
+    
+    def _generate_base():   #  generate a basic anchor (and all other anchors can be generated from the shift of the base)
+        base_size = 2**int(num_backboneblocks/2) # 1 feature pixel = 'base_size' origin pixels
+        if anchor_params == 9:
+            scales = [4,16,64]
+            ratios = [0.5,1,2]
+        elif anchor_params == 16:
+            scales = [16,64,256,1024]
+            ratios = [0.5,0.707,1.414,2]
+        else:
+            raise Exception('anchor_params can only be 9 or 16 currently.')
+        y = base_size/2
+        x = base_size/2
+        base_anchor = np.zeros((len(ratios) * len(scales), 4), dtype=np.float32) # shape : [anchor_types,4coordinates]
+        for i in range(len(ratios)):
+            for j in range(len(scales)):
+                h = base_size * scales[j] * np.sqrt(ratios[i])
+                w = base_size * scales[j] * np.sqrt(1. / ratios[i])
+                index = i * len(scales) + j
+                
+                # anchor coordinates must be integer(or not? the shifts are not integer.)
+                # base_anchor[index, 0] = int(y - h / 2)
+                # base_anchor[index, 1] = int(x - w / 2)
+                # base_anchor[index, 2] = int(y + h / 2)
+                # base_anchor[index, 3] = int(x + w / 2)
+                base_anchor[index, 0] = y - h / 2
+                base_anchor[index, 1] = x - w / 2
+                base_anchor[index, 2] = y + h / 2
+                base_anchor[index, 3] = x + w / 2
+
+        return base_anchor
+
+    def _generate_shift(): # ...on origin image scale
+        stride = 2**int(num_backboneblocks/2) 
+        shift_y = np.arange(0,img_size,stride)
+        shift_x = np.arange(0,img_size,stride)
+        # shift_x and shift y all equal to [0,16,32,...]
+        shift_x,shift_y = np.meshgrid(shift_x,shift_y)
+        '''
+        shift_x = [[0,16,32,...],
+                   [0,16,32,...],
+                   [0,16,32,...],
+                   ...]
+        shift_y = [[0, 0, 0,... ],
+                   [16,16,16,...],
+                   [32,32,32,...],
+                   ...]
+        '''
+        shift = np.stack((shift_y.ravel(),shift_x.ravel(),shift_y.ravel(),shift_x.ravel()), axis=1)
+        '''
+        shift_x.ravel() : [0,16,32,...,0,16,32,..,0,16,32,...],(1,w*h)
+        shift_y.ravel() : [0,0,0,...,16,16,16,...,32,32,32,...],(1,w*h)
+        shift : 
+            [[0,  0, 0,  0],
+            [16, 0, 16, 0],
+            [32, 0, 32, 0],
+            ...]
+        '''
+        
+        return shift
+
+    base_anchor = _generate_base()
+    shift = _generate_shift() 
+    num_anchor_per_loc = base_anchor.shape[0]
+    num_loc = shift.shape[0]
+
+    # "Numpy Broadcasting:"
+    anchor = base_anchor.reshape((1,num_anchor_per_loc,4))+shift.reshape((1,num_loc,4)).transpose((1,0,2)) # after broadcasting, shape : (num_loc,num_anchor_per_loc,4)
+    anchor = anchor.reshape((num_loc*num_anchor_per_loc,4)).astype(np.float32) # reshape anchor to : (num_loc*num_anchor_per_loc,4)
+    # get legal index inside the image
+    index = np.where(
+        (anchor[:,0]>=0) &
+        (anchor[:,1]>=0) &
+        (anchor[:,2]<=img_size) &
+        (anchor[:,3]<=img_size) 
+    )[0]
+
+    return anchor,index
+
+def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3,ratio=0.5): # create samples for Segmentor
+    
+    def _create_ious():
+        legal_anchor = anchor[index]
+        len_anchor = len(legal_anchor)
+        len_bbox = len(gt)
+        ious = np.empty(len_anchor,len_bbox) 
+        for i in range(len_anchor):
+            for j in range(len_anchor,len_bbox):
+                ious[i,j] = IoU_calculate(legal_anchor[i],gt[j],type=-1)
+                ious[j,i] = IoU_calculate(legal_anchor[i],gt[j],type=-1) 
+
+        argmax_ious = ious.argmax(axis=1) # shape : [1,len_bbox] . For every anchor find bbox whose ious is the biggest
+        max_ious = ious[np.arange(len_anchor), argmax_ious]
+
+        gt_argmax_ious = ious.argmax(axis=0) # shape : [len_anchor,1]. For every gt_bbox find anchor whose ious is the biggest
+        gt_max_ious = ious[gt_argmax_ious, np.arange(len_bbox)]
+        
+        gt_argmax_ious = np.where(ious == gt_max_ious)[0] # just a reshape:[len_anchor] (can be seen as [1,len_anchor])
+
+        return argmax_ious,max_ious,gt_argmax_ious 
+
+    def _create_label():
+        label = np.empty((len(index),),dtype=np.int32)
+        label.fill(-1)
+        argmax_ious,max_ious,gt_argmax_ious = _create_ious()
+
+        label[max_ious<nega_thresh] = 0 # tag all negative sample
+        label[gt_argmax_ious] = 1 # tag sample who has the biggest iou as positive
+        label[max_ious >= posi_thresh] = 1 # tag the remain positive sample
+
+        # sampling
+        n_pos = int(ratio * num_sample)
+        pos_index = np.where(label == 1)[0]
+        if len(pos_index) > n_pos:
+            disable_index = np.random.choice(
+                pos_index, size=(len(pos_index) - n_pos), replace=False)
+            label[disable_index] = -1
+
+        n_neg = num_sample - np.sum(label == 1)
+        neg_index = np.where(label == 0)[0]
+        if len(neg_index) > n_neg:
+            disable_index = np.random.choice(
+                neg_index, size=(len(neg_index) - n_neg), replace=False)
+            label[disable_index] = -1
+        
+        return argmax_ious, label
+
+    argmax_ious, label = _create_label()
+    shift = shift_calculate(anchor[index],gt[argmax_ious])
+
+    label = unmap(label,len(anchor),index,fill=-1)
+    shift = unmap(label,len(anchor),index,fill=0)
+    
+    return shift, label
+
+def proposal_create(anchor,shift,score,img_size,train=False,nms_thresh=0.7,n_train_pre_nms=12000
+    ,n_train_post_nms=2000, n_test_pre_nms=6000, n_test_post_nms=300, min_size=16,device='cpu'): # create RoIs for Generator
+        
+        if train:
+            n_pre_nms = n_train_pre_nms
+            n_post_nms = n_train_post_nms
+        else:
+            n_pre_nms = n_test_pre_nms
+            n_post_nms = n_test_post_nms
+
+        roi = bbox_calculate(anchor, shift)
+
+        roi[:, slice(0, 4, 2)] = np.clip(
+            roi[:, slice(0, 4, 2)], 0, img_size[0])
+        roi[:, slice(1, 4, 2)] = np.clip(
+            roi[:, slice(1, 4, 2)], 0, img_size[1])
+
+        hs = roi[:, 2] - roi[:, 0]
+        ws = roi[:, 3] - roi[:, 1]
+
+        keep = np.where((hs >= min_size) & (ws >= min_size))[0]
+        roi = roi[keep, :]
+        score = score[keep]
+
+        order = score.ravel().argsort()[::-1]
+
+        if n_pre_nms > 0:
+            order = order[:n_pre_nms]
+        roi = roi[order, :]
+        score = score[order]
+
+        keep = nms(from_numpy(roi).to(device), from_numpy(score).to(device), nms_thresh)
+        if n_post_nms > 0:
+            keep = keep[:n_post_nms]
+        roi = roi[keep.cpu().numpy()]
+
+        return roi
 
 def poses_draw(imgs, num_rows, num_cols, titles=None, scale=1.5):  
 

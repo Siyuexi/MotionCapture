@@ -42,7 +42,7 @@ device = device("cuda" if cuda.is_available() else "cpu")
 print("device : "+str(device),file=log,flush=True)
 print("device : "+str(device),file=sys.stdout)
 
-model = ExtractNet()
+model = ExtractNet(img_size)
 # print(model)
 model = model.to(device)
 
