@@ -13,12 +13,12 @@ class Parser(data.Dataset):
         self.img_path = img_path
         self.img_size = img_size
         
-        self.last_name = self.annot[0]['image'] # some people are in the same image, and these samples are adjacent to each other
-        self.index_shift = 0
-
         file = open(annot_path, "rb")
         self.annot = json.load(file) 
         file.close()
+
+        self.last_name = self.annot[0]['image'] # some people are in the same image, and these samples are adjacent to each other
+        self.index_shift = 0
 
     def __getitem__(self,index):
         idx = index + self.index_shift
@@ -61,5 +61,5 @@ class Parser(data.Dataset):
             if(ln==cn):
                 cnt += 1
             ln = cn
-        le = le - cn
+        le = le - cnt
         return le
