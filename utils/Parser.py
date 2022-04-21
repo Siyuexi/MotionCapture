@@ -1,6 +1,7 @@
 # a dataset parser for json
 
 import json
+import os
 from torch.utils import data
 from PIL import Image
 import numpy as np
@@ -13,46 +14,27 @@ class Parser(data.Dataset):
         self.img_path = img_path
         self.img_size = img_size
         
-        file = open(annot_path, "rb")
+        file = open(self.annot_path, "rb")
         self.annot = json.load(file) 
         file.close()
 
-        self.last_name = self.annot[0]['image'] # some people are in the same image, and these samples are adjacent to each other
-        self.index_shift = 0
+        self.num_img = self._get_len()
+        self.label_dict = self._build_dict()
 
-    def __getitem__(self,index):
-        idx = index + self.index_shift
-        img_name = self.annot[idx]['image'] # a string
+    def _get_info(self,index,w,h):
+        
+        joint = np.array(self.annot[index]['joints'])
+        joint = np.array([joint[:,0]/w,joint[:,1]/h]).transpose()
+        joint = joint*self.img_size
+        
+        hl = self.annot[index]['scale']*100
+        cx = self.annot[index]['center'][0]
+        cy = self.annot[index]['center'][1]
+        bbox = np.array([(cx-hl)/w,(cy-hl)/h,(cx+hl)/w,(cy+hl)/h])
+        bbox = bbox * self.img_size      
+        return joint,bbox
 
-        joints = []
-        bboxes = []
-
-        while(img_name==self.last_name):
-            self.last_name = img_name
-            self.index_shift += 1 # add shift
-
-            img = Image.open(self.img_path+'/'+img_name)
-            w = img.width
-            h = img.height
-            img.resize((self.img_size,self.img_size))
-            img = np.array(img)
-
-            joint = np.array(self.annot[idx]['joints'])
-            joint = np.array([joint[:,0]/w,joint[:,1]/h]).transpose()
-            joint = joint*self.img_size
-            
-            hl = self.annot[idx]['scale']*100
-            cx = self.annot[idx]['center'][0]
-            cy = self.annot[idx]['center'][1]
-            bbox = np.array([(cx-hl)/w,(cy-hl)/h,(cx+hl)/w,(cy+hl)/h])
-            bbox = bbox * self.img_size
-
-            joints.append(joint)
-            bboxes.append(bbox)
-
-        return img,joints,bboxes
-    
-    def __len__(self):
+    def _get_len(self):
         cnt = 0
         ln = ''
         le = len(self.annot)
@@ -63,3 +45,46 @@ class Parser(data.Dataset):
             ln = cn
         le = le - cnt
         return le
+
+    def _build_dict(self): # build a label reflection dict
+
+        label_dict = {} # emtpy dict
+        index_shift = 0 # zero shift
+        for index in range(self.num_img):
+            print(index)
+            img_name = self.annot[index + index_shift]['image'] # a string
+
+            img = Image.open(self.img_path+'/'+img_name)
+            w = img.width
+            h = img.height
+            
+            joint,bbox = self._get_info(index+index_shift,w,h)
+        
+            joints = [joint]
+            bboxes = [bbox]
+
+            if(index+index_shift+1 == len(self.annot)):
+                break
+            while(self.annot[index + index_shift + 1]['image']==img_name): # if next img is the same
+                
+                index_shift += 1
+                joint,bbox = self._get_info(index+index_shift,w,h)
+
+                joints.append(joint)
+                bboxes.append(bbox)
+
+            label_dict[img_name] = [joints,bboxes]
+
+        return label_dict
+
+
+
+    def __getitem__(self,index): # if one image contains n sample, then this image will be trained n times in one epoch.
+        img_name = self.annot[index]['image'] 
+        img = Image.open(self.img_path+'/'+img_name) 
+        img.resize((self.img_size,self.img_size))
+        img = np.array(img) 
+        return img,img_name
+    
+    def __len__(self):
+        return len(self.annot)
