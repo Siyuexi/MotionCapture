@@ -209,7 +209,7 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
         legal_anchor = anchor[index]
         len_anchor = len(legal_anchor)
         len_bbox = len(gt)
-        ious = np.empty(len_anchor,len_bbox) 
+        ious = np.empty((len_anchor,len_bbox)) 
         for i in range(len_anchor):
             for j in range(len_anchor,len_bbox):
                 ious[i,j] = IoU_calculate(legal_anchor[i],gt[j],type=-1)
@@ -226,7 +226,7 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
         return argmax_ious,max_ious,gt_argmax_ious 
 
     def _create_label():
-        label = np.empty((len(index),),dtype=np.int32)
+        label = np.empty((len(index),),dtype=np.int64)
         label.fill(-1)
         argmax_ious,max_ious,gt_argmax_ious = _create_ious()
 
@@ -252,10 +252,9 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
         return argmax_ious, label
 
     argmax_ious, label = _create_label()
-    shift = shift_calculate(anchor[index],gt[argmax_ious])
-
+    shift = shift_calculate(anchor[index],np.array(gt,dtype=np.float32)[argmax_ious])
     label = unmap(label,len(anchor),index,fill=-1)
-    shift = unmap(label,len(anchor),index,fill=0)
+    shift = unmap(shift,len(anchor),index,fill=0)
     
     return shift, label
 

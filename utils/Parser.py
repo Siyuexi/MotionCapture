@@ -9,8 +9,15 @@ import numpy as np
 
 
 class Parser(data.Dataset):
-    def __init__(self,annot_path="dataset/mpii/train.json",img_path="D:/MPII_dataset/images",img_size=256) -> None:
-        self.annot_path = annot_path
+    def __init__(self,annot_path="dataset/mpii/",img_path="D:/MPII_dataset/images",img_size=256,type='train') -> None:
+        self.annot_path = annot_path 
+        if(type == 'train'):
+            self.annot_path = self.annot_path + 'train.json'
+        elif(type == 'valid'):
+            self.annot_path = self.annot_path + "valid.json"
+        elif(type== 'test'):
+            self.annot_path = self.annot_path + "test.json"
+
         self.img_path = img_path
         self.img_size = img_size
         
@@ -51,7 +58,7 @@ class Parser(data.Dataset):
         label_dict = {} # emtpy dict
         index_shift = 0 # zero shift
         for index in range(self.num_img):
-            print(index)
+
             img_name = self.annot[index + index_shift]['image'] # a string
 
             img = Image.open(self.img_path+'/'+img_name)
@@ -82,8 +89,9 @@ class Parser(data.Dataset):
     def __getitem__(self,index): # if one image contains n sample, then this image will be trained n times in one epoch.
         img_name = self.annot[index]['image'] 
         img = Image.open(self.img_path+'/'+img_name) 
-        img.resize((self.img_size,self.img_size))
-        img = np.array(img) 
+        img = img.resize((self.img_size,self.img_size))
+        img = np.array(img,dtype=np.float32) 
+        img = img.transpose((2,0,1))
         return img,img_name
     
     def __len__(self):

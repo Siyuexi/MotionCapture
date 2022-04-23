@@ -6,8 +6,8 @@ from GestaltNet import GestaltNet
 
 
 class ExtractNet(GestaltNet):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self,img_size) -> None:
+        super().__init__(img_size)
         self.avgpooling = nn.AdaptiveAvgPool2d((1,1))
         self.fc = nn.Linear(512,10)
 
@@ -20,32 +20,24 @@ class ExtractNet(GestaltNet):
 
 
 class GeneratNet(GestaltNet):
-    def __init__(self) -> None:
-        super().__init__()
-        self.avgpooling = nn.AdaptiveAvgPool2d((1,1))
-        self.fc = nn.Linear(512,10)
+    def __init__(self,img_size) -> None:
+        super().__init__(img_size)
 
     def forward(self,x):
-        with no_grad():
-            x = self.extractor.forward(x)
-        x = self.generator.forward(x)
-        x = self.avgpooling(x)
-        x = x.view(x.size(0),-1) # reshape tensor to [batch_size,feature_tensor]
-        x = self.fc(x)
-        return x
+        # with no_grad():
+        #     x = self.extractor.forward(x)
+        x = self.extractor.forward(x)
+        prob = self.generator.forward(x)
+        return prob
 
 
 class SegmentNet(GestaltNet):
-    def __init__(self) -> None:
-        super().__init__()
-        self.avgpooling = nn.AdaptiveAvgPool2d((1,1))
-        self.fc = nn.Linear(512,10)
+    def __init__(self,img_size) -> None:
+        super().__init__(img_size)
 
     def forward(self,x):
-        with no_grad():
-            x = self.extractor.forward(x)
-        x = self.segmentor.forward(x)
-        x = self.avgpooling(x)
-        x = x.view(x.size(0),-1) # reshape tensor to [batch_size,feature_tensor]
-        x = self.fc(x)
-        return x
+        # with no_grad():
+        #     x = self.extractor.forward(x)
+        x = self.extractor.forward(x)
+        loc,sco = self.segmentor.forward(x)
+        return loc,sco

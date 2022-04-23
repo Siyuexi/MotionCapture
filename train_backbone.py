@@ -66,7 +66,7 @@ for epoch in range(num_epochs):
 
         model.train()
         
-        output =  model(data) 
+        output =  model(data)
         loss = criterion(output, label) 
         
         optimizer.zero_grad()
