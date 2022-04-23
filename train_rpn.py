@@ -1,11 +1,11 @@
 # train
 
 from torchvision import transforms,datasets
-from torch import device,cuda,nn,optim,no_grad,tensor
+from torch import device,cuda,nn,optim,no_grad,tensor,set_printoptions
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import sys
-
+set_printoptions(threshold=1e6)
 from utils.examples import SegmentNet
 from utils.tools import accurate_count,selective_load,complete_save,learning_draw,anchor_create,sample_create,bbox_calculate
 from utils.Parser import Parser
@@ -14,6 +14,7 @@ num_epochs = 10
 batch_size = 1 # for rpn training, batch_size fixed at 1
 img_size =512
 
+num_sample = 256 # rpn sample number
 lambda_cls = 1 # weight of classification loss
 lambda_loc = 1 # weight of localization loss
 
@@ -73,7 +74,7 @@ for epoch in range(num_epochs):
         data = data.to(device)
         bboxes = train_set.label_dict[img_name[0]][1]
 
-        shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=256)
+        shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample)
 
         model.train()
         
@@ -105,7 +106,7 @@ for epoch in range(num_epochs):
                 data = data.to(device)
                 bboxes = test_set.label_dict[img_name[0]][1]
 
-                shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=128)
+                shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample)
                 
                 loc,sco =  model(data)
                 loc = loc.squeeze(0)
@@ -121,9 +122,9 @@ for epoch in range(num_epochs):
                 accuracies = accurate_count(sco, label) 
                 val_accuracy.append(accuracies)
                 
-            train_r = (sum([tup[0] for tup in train_accuracy]), sum([tup[1] for tup in train_accuracy]))
+            train_r = (sum([tup[0] for tup in train_accuracy]), sum([num_sample for tup in train_accuracy]))
 
-            val_r = (sum([tup[0] for tup in val_accuracy]), sum([tup[1] for tup in val_accuracy]))
+            val_r = (sum([tup[0] for tup in val_accuracy]), sum([num_sample for tup in val_accuracy]))
             
             train_acc_r = 100. * train_r[0] / train_r[1]
             val_acc_r = 100. * val_r[0] / val_r[1]
