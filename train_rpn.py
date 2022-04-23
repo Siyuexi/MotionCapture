@@ -12,7 +12,7 @@ from utils.Parser import Parser
 
 num_epochs = 1
 batch_size = 1 # for rpn training, batch_size fixed at 1
-img_size =256
+img_size =512
 
 lambda_cls = 10 # weight of classification loss
 lambda_loc = 1 # weight of localization loss
@@ -21,9 +21,9 @@ model_name = "segmentor-pretrain"
 log = open('log/'+model_name+'.txt','wt')
 
 print("loading training dataset")
-train_set = Parser(type='train')
+train_set = Parser(img_size=img_size,type='train')
 print("loading testing dataset")
-test_set = Parser(type='valid')
+test_set = Parser(img_size=img_size,type='valid')
 
 test_size = len(test_set)
 indices = range(test_size)
@@ -73,7 +73,7 @@ for epoch in range(num_epochs):
         data = data.to(device)
         bboxes = train_set.label_dict[img_name[0]][1]
 
-        shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=128)
+        shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=256)
 
         model.train()
         

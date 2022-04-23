@@ -248,7 +248,7 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
             disable_index = np.random.choice(
                 neg_index, size=(len(neg_index) - n_neg), replace=False)
             label[disable_index] = -1
-        
+
         return argmax_ious, label
 
     argmax_ious, label = _create_label()
