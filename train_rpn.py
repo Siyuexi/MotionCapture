@@ -10,20 +10,20 @@ from utils.examples import SegmentNet
 from utils.tools import accurate_count,selective_load,complete_save,learning_draw,anchor_create,sample_create,bbox_calculate
 from utils.Parser import Parser
 
-num_epochs = 1
+num_epochs = 10
 batch_size = 1 # for rpn training, batch_size fixed at 1
 img_size =512
 
-lambda_cls = 10 # weight of classification loss
+lambda_cls = 1 # weight of classification loss
 lambda_loc = 1 # weight of localization loss
 
 model_name = "segmentor-pretrain"
 log = open('log/'+model_name+'.txt','wt')
 
 print("loading training dataset")
-train_set = Parser(img_size=img_size,type='train')
+train_set = Parser(img_size=img_size,img_path="D:/MPII_dataset/images",type='train')
 print("loading testing dataset")
-test_set = Parser(img_size=img_size,type='valid')
+test_set = Parser(img_size=img_size,img_path="D:/MPII_dataset/images",type='valid')
 
 test_size = len(test_set)
 indices = range(test_size)

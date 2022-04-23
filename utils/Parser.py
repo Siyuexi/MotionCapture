@@ -9,7 +9,7 @@ import numpy as np
 
 
 class Parser(data.Dataset):
-    def __init__(self,annot_path="dataset/mpii/",img_path="D:/MPII_dataset/images",img_size=256,type='train') -> None:
+    def __init__(self,annot_path="dataset/mpii/",img_path="images",img_size=256,type='train') -> None:
         self.annot_path = annot_path 
         if(type == 'train'):
             self.annot_path = self.annot_path + 'train.json'
