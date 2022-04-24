@@ -25,6 +25,7 @@ num_anchor = 9
 num_joint = 16
 lambda_cls = 2 # weight of classification loss
 lambda_loc = 1 # weight of localization loss
+train_batch = 5 # calculate 'train_batch' samples' loss together
 
 model_name = "segmentor-pretrain"
 log = open('log/'+model_name+'.txt','wt')
@@ -70,6 +71,8 @@ model,optimizer = selective_load(model,optimizer,"weights/extractor-pretrain-epo
 
 err_record = []
 best_acc_r = 1
+total_loss_cls = 0
+total_loss_loc = 0
 
 anchor,anchor_index = anchor_create(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor)
 
@@ -97,23 +100,33 @@ for epoch in range(num_epochs):
 
         loss_cls = criterion_cls(sco, label) 
         loss_loc = criterion_loc(loc[pos_index], shift[pos_index])
-        loss = lambda_cls*loss_cls + lambda_loc*loss_loc
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        total_loss_cls = total_loss_cls + loss_cls
+        total_loss_loc = total_loss_loc + loss_loc
         
         accuracies = accurate_count(sco, label)
         train_accuracy.append(accuracies)
 
+        if batch_id&train_batch ==0:# because batchsize fixed at 1, batch learning need more sample
+        
+            avg_loss_cls = total_loss_cls/train_batch
+            avg_loss_loc = total_loss_loc/train_batch
+            loss = lambda_cls*avg_loss_cls + lambda_loc*avg_loss_loc
+            
+            optimizer.zero_grad()
+            loss.backward() 
+            optimizer.step()
+
+            total_loss_cls = 0 # clean the history
+            total_loss_loc = 0
+        
         if batch_id%print_iter_loss ==0: 
             
             checkpoint = 'Epoch [{}/{}]\tBatch [{}/{}]\tSample [{}/{}]\tClsLoss: {:.6f}\tLocLoss: {:.6f}'.format(
                 epoch+1,num_epochs,
                 min(batch_id+print_iter_loss,train_size//batch_size),train_size//batch_size,
                 min((batch_id+print_iter_loss) * batch_size,train_size), train_size,
-                lambda_cls*loss_cls.item(),
-                lambda_loc*loss_loc.item()
+                lambda_cls*avg_loss_cls.item(),
+                lambda_loc*avg_loss_loc.item()
                 )
             print(checkpoint,file=log,flush=True)
             print(checkpoint,file=sys.stdout)
