@@ -12,12 +12,13 @@ from utils.examples import SegmentNet
 from utils.tools import IoU_calculate, accurate_count,selective_load,complete_save,learning_draw,anchor_create,sample_create,bbox_calculate
 from utils.Parser import Parser
 
-num_epochs = 1
+num_epochs = 16
 batch_size = 1 # for rpn training, batch_size fixed at 1
 img_size =512
 
-print_iter = 200 # after 'print_iter' print a log
-
+print_iter_loss = 200 # after 'print_iter_loss' batch print a loss log
+print_iter_acc = 2 # after 'print_iter_acc' epoch print a acc log
+ 
 num_sample = 256 # rpn sample number
 num_backboneblock = 8 
 num_anchor = 9 
@@ -64,7 +65,7 @@ criterion_loc = nn.MSELoss()
 # optimizer = optim.SGD(model.parameters(),lr=0.01,momentum=0.9)
 optimizer = optim.Adam(model.parameters())
 
-model,optimizer = selective_load(model,optimizer,"weights\extractor-pretrain-epoch-final.pth")
+model,optimizer = selective_load(model,optimizer,"weights/extractor-pretrain-epoch-final.pth")
  #model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"4"+".pth")
 
 err_record = []
@@ -105,50 +106,57 @@ for epoch in range(num_epochs):
         accuracies = accurate_count(sco, label)
         train_accuracy.append(accuracies)
 
-        if batch_id%print_iter ==0: 
-
-            model.eval() 
-            val_accuracy = []
+        if batch_id%print_iter_loss ==0: 
             
-            for (data, img_name) in val_loader: 
-
-                data = data.to(device)
-                bboxes = test_set.label_dict[img_name[0]][1]
-
-                shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample)
-                
-                loc,sco =  model(data)
-                loc = loc.squeeze(0)
-                sco = sco.squeeze(0)
-
-                shift = tensor(shift).to(device)
-                label = tensor(label).to(device)
-
-                accuracies = accurate_count(sco, label) 
-                val_accuracy.append(accuracies)
-
-                break # only select one image in valid set for testing
-                
-            train_r = (sum([tup[0] for tup in train_accuracy]), sum([num_sample for tup in train_accuracy]))
-
-            val_r = (sum([tup[0] for tup in val_accuracy]), sum([num_sample for tup in val_accuracy]))
-            
-            train_acc_r = 100. * train_r[0] / train_r[1]
-            val_acc_r = 100. * val_r[0] / val_r[1]
-            checkpoint = 'Epoch [{}/{}]\tBatch [{}/{}]\tSample [{}/{}]\tClsLoss: {:.6f}\tLocLoss: {:.6f}\tTrainAccuracy: {:.2f}%\tValidationAccuracy: {:.2f}%'.format(
-                epoch+1,num_epochs,min(batch_id+print_iter,train_size//batch_size),train_size//batch_size ,min((batch_id+print_iter) * batch_size,train_size), train_size,
+            checkpoint = 'Epoch [{}/{}]\tBatch [{}/{}]\tSample [{}/{}]\tClsLoss: {:.6f}\tLocLoss: {:.6f}'.format(
+                epoch+1,num_epochs,
+                min(batch_id+print_iter_loss,train_size//batch_size),train_size//batch_size,
+                min((batch_id+print_iter_loss) * batch_size,train_size), train_size,
                 lambda_cls*loss_cls.item(),
-                lambda_loc*loss_loc.item(),  
-                train_acc_r, # rpn training dosen't care about loc acc because positive label number is always more than ground truth number
-                val_acc_r)
+                lambda_loc*loss_loc.item()
+                )
             print(checkpoint,file=log,flush=True)
             print(checkpoint,file=sys.stdout)
-            if(val_acc_r > best_acc_r):
-                best_acc_r = val_acc_r
-                best_model_wts = model.state_dict()
-            err_record.append((100 - train_acc_r.cpu(), 100 - val_acc_r.cpu()))
 
-            train_accuracy = [] # clean the history
+    if epoch%print_iter_acc ==0:
+        model.eval() 
+        val_accuracy = []
+        
+        for (data, img_name) in val_loader: 
+
+            data = data.to(device)
+            bboxes = test_set.label_dict[img_name[0]][1]
+
+            _,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample)
+            
+            _,sco =  model(data)
+            sco = sco.squeeze(0)
+
+            label = tensor(label).to(device)
+
+            accuracies = accurate_count(sco, label) 
+            val_accuracy.append(accuracies)
+            
+        train_r = (sum([tup[0] for tup in train_accuracy]), sum([num_sample for tup in train_accuracy]))
+
+        val_r = (sum([tup[0] for tup in val_accuracy]), sum([num_sample for tup in val_accuracy]))
+        
+        train_acc_r = 100. * train_r[0] / train_r[1]
+        val_acc_r = 100. * val_r[0] / val_r[1]
+        checkpoint = 'Epoch [{}/{}]\tClsLoss: {:.6f}\tLocLoss: {:.6f}\tTrainAccuracy: {:.2f}%\tValidationAccuracy: {:.2f}%'.format(
+            epoch+1, num_epochs,
+            lambda_cls*loss_cls.item(),
+            lambda_loc*loss_loc.item(),  
+            train_acc_r, # rpn training dosen't care about loc acc because positive label number is always more than ground truth number
+            val_acc_r)
+        print(checkpoint,file=log,flush=True)
+        print(checkpoint,file=sys.stdout)
+        if(val_acc_r > best_acc_r):
+            best_acc_r = val_acc_r
+            best_model_wts = model.state_dict()
+        err_record.append((100 - train_acc_r.cpu(), 100 - val_acc_r.cpu()))
+
+        train_accuracy = [] # clean the history
 
     complete_save(best_model_wts,optimizer.state_dict(),"weights/"+model_name+'-epoch-'+str(epoch)+".pth")
 

@@ -9,11 +9,12 @@ import sys
 from utils.examples import ExtractNet
 from utils.tools import accurate_count,selective_load,complete_save,learning_draw
 
-num_epochs = 5
+num_epochs = 16
 batch_size = 16
 img_size =256
 
-print_iter = 100 # after 'print_iter' print a log
+print_iter_loss = 200 # after 'print_iter_loss' batch print a loss log
+print_iter_acc = 2 # after 'print_iter_acc' epoch print a acc log
 
 num_backboneblock = 8 
 num_anchor = 9 
@@ -83,42 +84,48 @@ for epoch in range(num_epochs):
         accuracies = accurate_count(output, label)
         train_accuracy.append(accuracies)
         
-        if batch_id%print_iter ==0: 
-
-            model.eval() 
-            val_accuracy = [] 
-            
-            for (data, label) in val_loader: 
-
-                data = data.to(device)
-                label = label.to(device)
-
-                output = model(data) 
-
-                accuracies = accurate_count(output, label) 
-                val_accuracy.append(accuracies)
-
-                break # only select one image in valid set for testing
-                
-            train_r = (sum([tup[0] for tup in train_accuracy]), sum([tup[1] for tup in train_accuracy]))
-
-            val_r = (sum([tup[0] for tup in val_accuracy]), sum([tup[1] for tup in val_accuracy]))
-            
-            train_acc_r = 100. * train_r[0] / train_r[1]
-            val_acc_r = 100. * val_r[0] / val_r[1]
-            checkpoint = 'Epoch [{}/{}]\tBatch [{}/{}]\tSample [{}/{}]\tLoss: {:.6f}\tTrainAccuracy: {:.2f}%\tValidationAccuracy: {:.2f}%'.format(
-                epoch+1,num_epochs,min(batch_id+print_iter,train_size//batch_size),train_size//batch_size ,min((batch_id+print_iter) * batch_size,train_size), train_size,
-                loss.item(), 
-                train_acc_r, 
-                val_acc_r)
+        if batch_id%print_iter_loss ==0: 
+            checkpoint = 'Epoch [{}/{}]\tBatch [{}/{}]\tSample [{}/{}]\tLoss: {:.6f}'.format(
+                epoch+1,num_epochs,
+                min(batch_id+print_iter_loss,train_size//batch_size),train_size//batch_size,
+                min((batch_id+print_iter_loss) * batch_size,train_size), train_size,
+                loss.item()
+                )
             print(checkpoint,file=log,flush=True)
             print(checkpoint,file=sys.stdout)
-            if(val_acc_r > best_acc_r):
-                best_acc_r = val_acc_r
-                best_model_wts = model.state_dict()
-            err_record.append((100 - train_acc_r.cpu(), 100 - val_acc_r.cpu()))
 
-            train_accuracy = [] # clean the history
+    if epoch%print_iter_acc ==0:
+        model.eval() 
+        val_accuracy = [] 
+        
+        for (data, label) in val_loader: 
+
+            data = data.to(device)
+            label = label.to(device)
+
+            output = model(data) 
+
+            accuracies = accurate_count(output, label) 
+            val_accuracy.append(accuracies)
+            
+        train_r = (sum([tup[0] for tup in train_accuracy]), sum([tup[1] for tup in train_accuracy]))
+
+        val_r = (sum([tup[0] for tup in val_accuracy]), sum([tup[1] for tup in val_accuracy]))
+        
+        train_acc_r = 100. * train_r[0] / train_r[1]
+        val_acc_r = 100. * val_r[0] / val_r[1]
+        checkpoint = 'Epoch [{}/{}]\tTrainAccuracy: {:.2f}%\tValidationAccuracy: {:.2f}%'.format(
+            epoch+1,num_epochs,
+            train_acc_r, 
+            val_acc_r)
+        print(checkpoint,file=log,flush=True)
+        print(checkpoint,file=sys.stdout)
+        if(val_acc_r > best_acc_r):
+            best_acc_r = val_acc_r
+            best_model_wts = model.state_dict()
+        err_record.append((100 - train_acc_r.cpu(), 100 - val_acc_r.cpu()))
+
+        train_accuracy = [] # clean the history
 
     complete_save(best_model_wts,optimizer.state_dict(),"weights/"+model_name+'-epoch-'+str(epoch)+".pth")
 

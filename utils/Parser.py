@@ -71,6 +71,10 @@ class Parser(data.Dataset):
             bboxes = [bbox]
 
             if(index+index_shift+1 == len(self.annot)):
+                joint,bbox = self._get_info(index+index_shift,w,h)
+                joints.append(joint)
+                bboxes.append(bbox)
+                label_dict[img_name] = [joints,bboxes]
                 break
             while(self.annot[index + index_shift + 1]['image']==img_name): # if next img is the same
                 
