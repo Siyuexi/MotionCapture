@@ -1,5 +1,6 @@
 # train
 
+from sched import scheduler
 from turtle import pos
 from torchvision import transforms,datasets
 from torch import device,cuda,nn,optim,no_grad,tensor,set_printoptions
@@ -64,7 +65,8 @@ best_model_wts = model.state_dict()
 criterion_cls = nn.CrossEntropyLoss(ignore_index=-1)
 criterion_loc = nn.MSELoss()
 # optimizer = optim.SGD(model.parameters(),lr=0.01,momentum=0.9)
-optimizer = optim.Adam(model.parameters())
+optimizer = optim.Adam(model.parameters(),lr=5e-4)
+schedule = optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda iter: 0.9*iter)
 
 model,optimizer = selective_load(model,optimizer,"weights/extractor-pretrain-epoch-final.pth")
  #model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"4"+".pth")
@@ -168,6 +170,8 @@ for epoch in range(num_epochs):
         err_record.append((100 - train_acc_r.cpu(), 100 - val_acc_r.cpu()))
 
         train_accuracy = [] # clean the history
+
+    schedule.step()
 
     complete_save(best_model_wts,optimizer.state_dict(),"weights/"+model_name+'-epoch-'+str(epoch)+".pth")
 
