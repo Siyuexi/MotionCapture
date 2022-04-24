@@ -91,6 +91,9 @@ for epoch in range(num_epochs):
         shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample)
         pos_index = where(label==1)[0]
 
+        if(len(pos_index)!=int(num_sample/2)): # strip abnormal sample
+            continue
+
         model.train()
         
         loc,sco =  model(data)
