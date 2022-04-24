@@ -13,6 +13,12 @@ num_epochs = 5
 batch_size = 16
 img_size =256
 
+print_iter = 100 # after 'print_iter' print a log
+
+num_backboneblock = 8 
+num_anchor = 9 
+num_joint = 16
+
 model_name = "extractor-pretrain"
 log = open('log/'+model_name+'.txt','wt')
 
@@ -42,13 +48,14 @@ device = device("cuda" if cuda.is_available() else "cpu")
 print("device : "+str(device),file=log,flush=True)
 print("device : "+str(device),file=sys.stdout)
 
-model = ExtractNet(img_size)
+model = ExtractNet(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor,joint_params=num_joint)
 # print(model)
 model = model.to(device)
 
 best_model_wts = model.state_dict()
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(),lr=0.01,momentum=0.9)
+# optimizer = optim.SGD(model.parameters(),lr=0.01,momentum=0.9)
+optimizer = optim.Adam(model.parameters())
 
 model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"4"+".pth")
 
@@ -76,7 +83,7 @@ for epoch in range(num_epochs):
         accuracies = accurate_count(output, label)
         train_accuracy.append(accuracies)
         
-        if batch_id%100 ==0: 
+        if batch_id%print_iter ==0: 
 
             model.eval() 
             val_accuracy = [] 
@@ -90,6 +97,8 @@ for epoch in range(num_epochs):
 
                 accuracies = accurate_count(output, label) 
                 val_accuracy.append(accuracies)
+
+                break # only select one image in valid set for testing
                 
             train_r = (sum([tup[0] for tup in train_accuracy]), sum([tup[1] for tup in train_accuracy]))
 
@@ -98,7 +107,7 @@ for epoch in range(num_epochs):
             train_acc_r = 100. * train_r[0] / train_r[1]
             val_acc_r = 100. * val_r[0] / val_r[1]
             checkpoint = 'Epoch [{}/{}]\tBatch [{}/{}]\tSample [{}/{}]\tLoss: {:.6f}\tTrainAccuracy: {:.2f}%\tValidationAccuracy: {:.2f}%'.format(
-                epoch+1,num_epochs,min(batch_id+100,train_size//batch_size),train_size//batch_size ,min((batch_id+100) * batch_size,train_size), train_size,
+                epoch+1,num_epochs,min(batch_id+print_iter,train_size//batch_size),train_size//batch_size ,min((batch_id+print_iter) * batch_size,train_size), train_size,
                 loss.item(), 
                 train_acc_r, 
                 val_acc_r)
@@ -108,6 +117,9 @@ for epoch in range(num_epochs):
                 best_acc_r = val_acc_r
                 best_model_wts = model.state_dict()
             err_record.append((100 - train_acc_r.cpu(), 100 - val_acc_r.cpu()))
+
+            train_accuracy = [] # clean the history
+
     complete_save(best_model_wts,optimizer.state_dict(),"weights/"+model_name+'-epoch-'+str(epoch)+".pth")
 
 learning_draw(model_name,err_record)

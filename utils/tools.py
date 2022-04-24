@@ -1,5 +1,5 @@
 # some tool functions
-from torch import load,save,max,min,zeros,is_tensor,from_numpy
+from torch import load,save,max,min, tensor,zeros,is_tensor,from_numpy,exp,stack
 from torchvision.ops import nms
 import matplotlib.pyplot as plt
 import numpy as np
@@ -53,18 +53,18 @@ def unmap(data,count,index,fill=0):
         ret[index,:]=data
     return ret
 
-def shift_calculate(anchor,gt): # for self-defined pre-training on Segmentor
+def shift_calculate(anchor,gt): # for self-defined pre-training on Segmentor // type == numpy.array
     # anchor:[xmin,ymin,xmax,ymax] ==> [xcenter,ycenter,w,h] 
-    ah = anchor[:,2] - anchor[:,0]
-    aw = anchor[:,3] - anchor[:,1]
-    ay = anchor[:,0] + 0.5*ah
-    ax = anchor[:,1] + 0.5*aw
+    aw = anchor[:,2] - anchor[:,0]
+    ah = anchor[:,3] - anchor[:,1]
+    ax = anchor[:,0] + 0.5*aw
+    ay = anchor[:,1] + 0.5*ah
 
     # gt:[xmin,ymin,xmax,ymax] ==> [x,y,w,h]
-    th = gt[:,2] - gt[:,0]
-    tw = gt[:,3] - gt[:,1]
-    ty = gt[:,0] + 0.5*th
-    tx = gt[:,1] + 0.5*tw 
+    tw = gt[:,2] - gt[:,0]
+    th = gt[:,3] - gt[:,1]
+    tx = gt[:,0] + 0.5*tw
+    ty = gt[:,1] + 0.5*th 
 
     # get a very small number eps to avoid "/0" exception
     eps = np.finfo(ah.dtype).eps
@@ -76,23 +76,29 @@ def shift_calculate(anchor,gt): # for self-defined pre-training on Segmentor
     dh = np.log(th/h)
     dw = np.log(tw/w)
 
-    shift = np.vstack((dy,dx,dh,dw)).transpose()
+    shift = np.vstack((dx,dy,dw,dh)).transpose()
 
     return shift
 
-def bbox_calculate(anchor,shift):
+def bbox_calculate(anchor,shift): # for bbox prediction // type == torch.tensor
     # anchor:[xmin,ymin,xmax,ymax] ==> [xcenter,ycenter,w,h] 
-    ah = anchor[:,2] - anchor[:,0]
-    aw = anchor[:,3] - anchor[:,1]
-    ay = anchor[:,0] + 0.5*ah
-    ax = anchor[:,1] + 0.5*aw
+    aw = anchor[:,2] - anchor[:,0]
+    ah = anchor[:,3] - anchor[:,1]
+    ax = anchor[:,0] + 0.5*aw
+    ay = anchor[:,1] + 0.5*ah
 
+    # shift:[dx,dy,dw,dh]
     bx = ax + aw*shift[:,0]
     by = ay + ah*shift[:,1]
-    bw = aw*np.exp(shift[:,2])
-    bh = ah*np.exp(shift[:,3])
+    bw = aw*exp(shift[:,2])
+    bh = ah*exp(shift[:,3])
 
-    bbox = np.vstack((bx,by,bx,bh)).transpose()
+    xmin = bx - 0.5*bw
+    ymin = by - 0.5*bh
+    xmax = bw + xmin
+    ymax = bh + ymin
+
+    bbox = stack([xmin,ymin,xmax,ymax],dim=1)
 
     return bbox
 
@@ -120,7 +126,7 @@ def IoU_calculate(box1,box2,threshold=0.5,type=0): # type==0:find those who >= t
     else:
         return iou
 
-    return iou,num,len(iou)
+    return iou,num
 
 def anchor_create(img_size,num_backboneblocks,anchor_params): # anchor_params == 9 or 16
     # type of anchor coordinates : Numpy (not Tensor)
@@ -213,7 +219,7 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
         for i in range(len_anchor):
             for j in range(len_anchor,len_bbox):
                 ious[i,j] = IoU_calculate(legal_anchor[i],gt[j],type=-1)
-                ious[j,i] = IoU_calculate(legal_anchor[i],gt[j],type=-1) 
+                ious[j,i] = ious[i,j]
 
         argmax_ious = ious.argmax(axis=1) # shape : [1,len_bbox] . For every anchor find bbox whose ious is the biggest
         max_ious = ious[np.arange(len_anchor), argmax_ious]
