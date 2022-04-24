@@ -75,6 +75,7 @@ err_record = []
 best_acc_r = 1
 total_loss_cls = 0
 total_loss_loc = 0
+num_legal_sample = 0
 
 anchor,anchor_index = anchor_create(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor)
 
@@ -93,6 +94,8 @@ for epoch in range(num_epochs):
 
         if(len(pos_index)!=int(num_sample/2)): # strip abnormal sample
             continue
+        else:
+            num_legal_sample = num_legal_sample + 1
 
         model.train()
         
@@ -113,8 +116,8 @@ for epoch in range(num_epochs):
 
         if batch_id&train_batch ==0:# because batchsize fixed at 1, batch learning need more sample
         
-            avg_loss_cls = total_loss_cls/train_batch
-            avg_loss_loc = total_loss_loc/train_batch
+            avg_loss_cls = total_loss_cls/num_legal_sample
+            avg_loss_loc = total_loss_loc/num_legal_sample
             loss = lambda_cls*avg_loss_cls + lambda_loc*avg_loss_loc
             
             optimizer.zero_grad()
@@ -123,6 +126,7 @@ for epoch in range(num_epochs):
 
             total_loss_cls = 0 # clean the history
             total_loss_loc = 0
+            num_legal_sample = 0
         
         if batch_id%print_iter_loss ==0: 
             
