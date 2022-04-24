@@ -12,6 +12,9 @@ class BasicBlock(nn.Module):
         self.bn = nn.BatchNorm2d(self.channel_num)
         self.lu = nn.LeakyReLU(0.1)
 
+        # weight init
+        nn.init.normal_(self.conv.weight,mean=0,std=1)
+
     def forward(self,x):
         x = self.conv(x)
         x = self.bn(x)

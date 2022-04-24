@@ -12,6 +12,9 @@ class Generator(nn.Module):
 
         self.blocks = nn.ModuleList([TransposeBlock(64*(2**(3-i)))for i in range(int(self.num_backboneblocks/2))])
         self.estimation = nn.Conv2d(64,self.joint_params,kernel_size=1,stride=1,padding=0)
+        
+        # weight init
+        nn.init.normal_(self.estimation.weight,mean=0,std=1)
 
     def forward(self,x):
         x = self.blocks(x)

@@ -134,10 +134,10 @@ def anchor_create(img_size,num_backboneblocks,anchor_params): # anchor_params ==
     def _generate_base():   #  generate a basic anchor (and all other anchors can be generated from the shift of the base)
         base_size = 2**int(num_backboneblocks/2) # 1 feature pixel = 'base_size' origin pixels
         if anchor_params == 9:
-            scales = [4,16,64]
+            scales = [8,16,32]
             ratios = [0.5,1,2]
         elif anchor_params == 16:
-            scales = [16,64,256,1024]
+            scales = [8,16,32,64]
             ratios = [0.5,0.707,1.414,2]
         else:
             raise Exception('anchor_params can only be 9 or 16 currently.')

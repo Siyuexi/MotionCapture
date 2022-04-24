@@ -95,7 +95,7 @@ class Parser(data.Dataset):
         img = Image.open(self.img_path+'/'+img_name) 
         img = img.resize((self.img_size,self.img_size))
         img = np.array(img,dtype=np.float32) 
-        img = img.transpose((2,0,1))
+        img = img.transpose((2,0,1))/255
         return img,img_name
     
     def __len__(self):

@@ -22,7 +22,7 @@ print_iter_acc = 2 # after 'print_iter_acc' epoch print a acc log
  
 num_sample = 256 # rpn sample number
 num_backboneblock = 8 
-num_anchor = 9 
+num_anchor = 16
 num_joint = 16
 lambda_cls = 2 # weight of classification loss
 lambda_loc = 1 # weight of localization loss
@@ -64,11 +64,11 @@ model = model.to(device)
 best_model_wts = model.state_dict()
 criterion_cls = nn.CrossEntropyLoss(ignore_index=-1)
 criterion_loc = nn.MSELoss()
-# optimizer = optim.SGD(model.parameters(),lr=0.01,momentum=0.9)
-optimizer = optim.Adam(model.parameters(),lr=5e-4)
+optimizer = optim.SGD(model.parameters(),lr=1e-4,momentum=0.9)
+# optimizer = optim.Adam(model.parameters(),lr=5e-4)
 schedule = optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda iter: 0.9*iter)
 
-model,optimizer = selective_load(model,optimizer,"weights/extractor-pretrain-epoch-final.pth")
+# model,optimizer = selective_load(model,optimizer,"weights/extractor-pretrain-epoch-final.pth")
  #model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"4"+".pth")
 
 err_record = []
@@ -89,7 +89,7 @@ for epoch in range(num_epochs):
         data = data.to(device)
         bboxes = train_set.label_dict[img_name[0]][1]
 
-        shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample)
+        shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample,posi_thresh=0.6,nega_thresh=0.4)
         pos_index = where(label==1)[0]
 
         if(len(pos_index)!=int(num_sample/2)): # strip abnormal sample

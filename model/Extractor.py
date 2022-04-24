@@ -15,6 +15,9 @@ class Extractor(nn.Module):
         self.blocks = nn.ModuleList([ResidualBlock(64*(2**int(i/2)))for i in range(self.block_num)])
         self.samplings = nn.ModuleList([nn.Conv2d(64*(2**i),64*(2**(i+1)),kernel_size=3,stride=2,padding=1)for i in range(int(self.block_num/2)-1)])
 
+        # weight init
+        nn.init.normal_(self.conv1.weight,mean=0,std=1)
+        nn.init.normal_(self.conv2.weight,mean=0,std=1)
 
     def forward(self,x):
         x = self.conv1(x)
