@@ -143,10 +143,8 @@ for epoch in range(num_epochs):
         
         train_acc_r = 100. * train_r[0] / train_r[1]
         val_acc_r = 100. * val_r[0] / val_r[1]
-        checkpoint = 'Epoch [{}/{}]\tClsLoss: {:.6f}\tLocLoss: {:.6f}\tTrainAccuracy: {:.2f}%\tValidationAccuracy: {:.2f}%'.format(
+        checkpoint = 'Epoch [{}/{}]\tTrainAccuracy: {:.2f}%\tValidationAccuracy: {:.2f}%'.format(
             epoch+1, num_epochs,
-            lambda_cls*loss_cls.item(),
-            lambda_loc*loss_loc.item(),  
             train_acc_r, # rpn training dosen't care about loc acc because positive label number is always more than ground truth number
             val_acc_r)
         print(checkpoint,file=log,flush=True)
