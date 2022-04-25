@@ -1,4 +1,5 @@
 # some tool functions
+from cv2 import INTER_AREA
 from torch import load,save,max,min, tensor,zeros,is_tensor,from_numpy,exp,stack
 from torchvision.ops import nms
 import matplotlib.pyplot as plt
@@ -103,26 +104,29 @@ def bbox_calculate(anchor,shift): # for bbox prediction // type == torch.tensor
     return bbox
 
 def IoU_calculate(box1,box2,threshold=0.5,type=0): # type==0:find those who >= threshold; type==1:find those who <=threshold;else do not calculate acc
-    b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
-    b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
+    b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3]
+    b2_x1, b2_y1, b2_x2, b2_y2 = box2[0], box2[1], box2[2], box2[3]
 
-    inter_rect_x1 = max(b1_x1, b2_x1)
-    inter_rect_y1 = max(b1_y1, b2_y1)
-    inter_rect_x2 = min(b1_x2, b2_x2)
-    inter_rect_y2 = min(b1_y2, b2_y2)
+    inter_rect_x1 = np.max([b1_x1, b2_x1])
+    inter_rect_y1 = np.max([b1_y1, b2_y1])
+    inter_rect_x2 = np.min([b1_x2, b2_x2])
+    inter_rect_y2 = np.min([b1_y2, b2_y2])
 
-    inter_area = max(inter_rect_x2 - inter_rect_x1 + 1, zeros(inter_rect_x2.shape)) * max(
-        inter_rect_y2 - inter_rect_y1 + 1, zeros(inter_rect_x2.shape))
+    if(inter_rect_x1>=inter_rect_x2 or inter_rect_y1>=inter_rect_y2):
+        iou = 0
 
-    b1_area = (b1_x2 - b1_x1 + 1) * (b1_y2 - b1_y1 + 1)
-    b2_area = (b2_x2 - b2_x1 + 1) * (b2_y2 - b2_y1 + 1)
+    else:
 
-    iou = inter_area / (b1_area + b2_area - inter_area)
-    
+        inter_area = (inter_rect_x2 - inter_rect_x1) * (inter_rect_y2 - inter_rect_y1)
+        b1_area = (b1_x2 - b1_x1) * (b1_y2 - b1_y1)
+        b2_area = (b2_x2 - b2_x1) * (b2_y2 - b2_y1)
+
+        iou = inter_area / (b1_area + b2_area - inter_area)
+
     if(type==0):
-        num = sum(i >= threshold for i in iou)
+        num = np.sum(i >= threshold for i in iou)
     elif(type==1):
-        num = sum(i <= threshold for i in iou)
+        num = np.sum(i <= threshold for i in iou)
     else:
         return iou
 
@@ -134,10 +138,10 @@ def anchor_create(img_size,num_backboneblocks,anchor_params): # anchor_params ==
     def _generate_base():   #  generate a basic anchor (and all other anchors can be generated from the shift of the base)
         base_size = 2**int(num_backboneblocks/2) # 1 feature pixel = 'base_size' origin pixels
         if anchor_params == 9:
-            scales = [8,16,32]
+            scales = [8,16,36]
             ratios = [0.5,1,2]
         elif anchor_params == 16:
-            scales = [8,16,32,64]
+            scales = [8,16,24,32]
             ratios = [0.5,0.707,1.414,2]
         else:
             raise Exception('anchor_params can only be 9 or 16 currently.')
@@ -155,10 +159,10 @@ def anchor_create(img_size,num_backboneblocks,anchor_params): # anchor_params ==
                 # base_anchor[index, 1] = int(x - w / 2)
                 # base_anchor[index, 2] = int(y + h / 2)
                 # base_anchor[index, 3] = int(x + w / 2)
-                base_anchor[index, 0] = y - h / 2
-                base_anchor[index, 1] = x - w / 2
-                base_anchor[index, 2] = y + h / 2
-                base_anchor[index, 3] = x + w / 2
+                base_anchor[index, 0] = x - w / 2
+                base_anchor[index, 1] = y - h / 2
+                base_anchor[index, 2] = x + w / 2
+                base_anchor[index, 3] = y + h / 2
 
         return base_anchor
 
@@ -178,7 +182,7 @@ def anchor_create(img_size,num_backboneblocks,anchor_params): # anchor_params ==
                    [32,32,32,...],
                    ...]
         '''
-        shift = np.stack((shift_y.ravel(),shift_x.ravel(),shift_y.ravel(),shift_x.ravel()), axis=1)
+        shift = np.stack((shift_x.ravel(),shift_y.ravel(),shift_x.ravel(),shift_y.ravel()), axis=1)
         '''
         shift_x.ravel() : [0,16,32,...,0,16,32,..,0,16,32,...],(1,w*h)
         shift_y.ravel() : [0,0,0,...,16,16,16,...,32,32,32,...],(1,w*h)
@@ -217,9 +221,8 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
         len_bbox = len(gt)
         ious = np.empty((len_anchor,len_bbox)) 
         for i in range(len_anchor):
-            for j in range(len_anchor,len_bbox):
+            for j in range(len_bbox):
                 ious[i,j] = IoU_calculate(legal_anchor[i],gt[j],type=-1)
-                ious[j,i] = ious[i,j]
 
         argmax_ious = ious.argmax(axis=1) # shape : [1,len_bbox] . For every anchor find bbox whose ious is the biggest
         max_ious = ious[np.arange(len_anchor), argmax_ious]
@@ -228,6 +231,20 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
         gt_max_ious = ious[gt_argmax_ious, np.arange(len_bbox)]
         
         gt_argmax_ious = np.where(ious == gt_max_ious)[0] # just a reshape:[len_anchor] (can be seen as [1,len_anchor])
+
+        # if(len(gt_argmax_ious)==0):
+        #     # print(gt_argmax_ious)
+        #     # print( gt_max_ious)
+        #     # print(ious.argmax(axis=0))
+        #     # print(np.arange(len_bbox))
+        #     # print(len_bbox)
+        # print(ious)
+        # print(len(gt))
+        # print(len(legal_anchor))
+        # print(legal_anchor)
+        # print(gt)
+        # exit()
+
 
         return argmax_ious,max_ious,gt_argmax_ious 
 
@@ -248,7 +265,7 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
                 pos_index, size=(len(pos_index) - n_pos), replace=False)
             label[disable_index] = -1
 
-        n_neg = num_sample - np.sum(label == 1)
+        n_neg = np.sum(label == 1)
         neg_index = np.where(label == 0)[0]
         if len(neg_index) > n_neg:
             disable_index = np.random.choice(

@@ -26,5 +26,6 @@ class Extractor(nn.Module):
             x = self.blocks[i*2](x)
             x = self.blocks[i*2+1](x)
             x = self.samplings[i](x)
-        x = self.blocks[self.block_num-1](x) # x means feature
+        x = self.blocks[self.block_num-2](x) # x means feature
+        x = self.blocks[self.block_num-1](x)
         return x
