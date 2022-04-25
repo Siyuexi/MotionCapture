@@ -1,5 +1,5 @@
 # some tool functions
-from cv2 import INTER_AREA
+
 from torch import load,save,max,min, tensor,zeros,is_tensor,from_numpy,exp,stack
 from torchvision.ops import nms
 import matplotlib.pyplot as plt

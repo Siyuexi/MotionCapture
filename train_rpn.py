@@ -1,7 +1,5 @@
 # train
 
-from sched import scheduler
-from turtle import pos
 from torchvision import transforms,datasets
 from torch import device,cuda,nn,optim,no_grad,tensor,set_printoptions
 from torch.utils.data import DataLoader
@@ -24,9 +22,8 @@ num_sample = 256 # rpn sample number
 num_backboneblock = 8 
 num_anchor = 16
 num_joint = 16
-lambda_cls = 2 # weight of classification loss
-lambda_loc = 1 # weight of localization loss
-train_batch = 5 # calculate 'train_batch' samples' loss together
+lambda_cls = 1 # weight of classification loss
+lambda_loc = 0 # weight of localization loss
 
 model_name = "segmentor-pretrain"
 log = open('log/'+model_name+'.txt','wt')
@@ -64,7 +61,7 @@ model = model.to(device)
 best_model_wts = model.state_dict()
 criterion_cls = nn.CrossEntropyLoss(ignore_index=-1)
 criterion_loc = nn.MSELoss()
-optimizer = optim.SGD(model.parameters(),lr=1e-4,momentum=0.9)
+optimizer = optim.SGD(model.parameters(),lr=1e-3,momentum=0.9)
 # optimizer = optim.Adam(model.parameters(),lr=5e-4)
 schedule = optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda iter: 0.9*iter)
 
@@ -73,9 +70,6 @@ schedule = optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda iter: 0.9*iter
 
 err_record = []
 best_acc_r = 1
-total_loss_cls = 0
-total_loss_loc = 0
-num_legal_sample = 0
 
 anchor,anchor_index = anchor_create(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor)
 
@@ -89,13 +83,12 @@ for epoch in range(num_epochs):
         data = data.to(device)
         bboxes = train_set.label_dict[img_name[0]][1]
 
-        shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample,posi_thresh=0.6,nega_thresh=0.4)
-        pos_index = where(label==1)[0]
+        shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample,posi_thresh=0.7,nega_thresh=0.3)
+        # print(shift.shape)
+        # print(label.shape)
 
-        if(len(pos_index)!=int(num_sample/2)): # strip abnormal sample
-            continue
-        else:
-            num_legal_sample = num_legal_sample + 1
+
+        pos_index = where(label==1)[0]
 
         model.train()
         
@@ -108,25 +101,15 @@ for epoch in range(num_epochs):
 
         loss_cls = criterion_cls(sco, label) 
         loss_loc = criterion_loc(loc[pos_index], shift[pos_index])
-        total_loss_cls = total_loss_cls + loss_cls
-        total_loss_loc = total_loss_loc + loss_loc
+        loss = lambda_cls*loss_cls + lambda_loc*loss_loc
+        loss = loss/len(pos_index) # loss batch norm because every image the sample number(aka ture batchsize) is unknown
+        
+        optimizer.zero_grad()
+        loss.backward() 
+        optimizer.step()
         
         accuracies = accurate_count(sco, label)
-        train_accuracy.append(accuracies)
-
-        if batch_id&train_batch ==0:# because batchsize fixed at 1, batch learning need more sample
-        
-            avg_loss_cls = total_loss_cls/num_legal_sample
-            avg_loss_loc = total_loss_loc/num_legal_sample
-            loss = lambda_cls*avg_loss_cls + lambda_loc*avg_loss_loc
-            
-            optimizer.zero_grad()
-            loss.backward() 
-            optimizer.step()
-
-            total_loss_cls = 0 # clean the history
-            total_loss_loc = 0
-            num_legal_sample = 0
+        train_accuracy.append(accuracies) 
         
         if batch_id%print_iter_loss ==0: 
             
@@ -134,8 +117,8 @@ for epoch in range(num_epochs):
                 epoch+1,num_epochs,
                 min(batch_id+print_iter_loss,train_size//batch_size),train_size//batch_size,
                 min((batch_id+print_iter_loss) * batch_size,train_size), train_size,
-                lambda_cls*avg_loss_cls.item(),
-                lambda_loc*avg_loss_loc.item()
+                lambda_cls*loss_cls.item(),
+                lambda_loc*loss_loc.item()
                 )
             print(checkpoint,file=log,flush=True)
             print(checkpoint,file=sys.stdout)
