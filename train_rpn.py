@@ -29,7 +29,7 @@ model_name = "segmentor-pretrain"
 log = open('log/'+model_name+'.txt','wt')
 
 print("loading training dataset")
-train_set = Parser(img_size=img_size,img_path="D:/MPII_dataset/images",type='train')
+train_set = Parser(img_size=img_size,img_path="D:/MPII_dataset/images",type='valid') # use smaller set
 print("loading testing dataset")
 test_set = Parser(img_size=img_size,img_path="D:/MPII_dataset/images",type='valid')
 
@@ -61,7 +61,7 @@ model = model.to(device)
 best_model_wts = model.state_dict()
 criterion_cls = nn.CrossEntropyLoss(ignore_index=-1)
 criterion_loc = nn.MSELoss()
-optimizer = optim.SGD(model.parameters(),lr=1e-3,momentum=0.9)
+optimizer = optim.SGD(model.parameters(),lr=1e-4,momentum=0.9)
 # optimizer = optim.Adam(model.parameters(),lr=5e-4)
 schedule = optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda iter: 0.9*iter)
 
@@ -76,6 +76,7 @@ anchor,anchor_index = anchor_create(img_size,num_backboneblocks=num_backbonebloc
 for epoch in range(num_epochs):
 
     train_accuracy = []
+    num_legal_sample = 0
     
     for batch_id, (data,img_name) in enumerate(train_loader):
 
@@ -89,6 +90,7 @@ for epoch in range(num_epochs):
 
 
         pos_index = where(label==1)[0]
+        num_legal_sample = num_legal_sample + 2*len(pos_index)
 
         model.train()
         
@@ -102,7 +104,7 @@ for epoch in range(num_epochs):
         loss_cls = criterion_cls(sco, label) 
         loss_loc = criterion_loc(loc[pos_index], shift[pos_index])
         loss = lambda_cls*loss_cls + lambda_loc*loss_loc
-        loss = loss/len(pos_index) # loss batch norm because every image the sample number(aka ture batchsize) is unknown
+        # loss = loss/len(pos_index) # loss batch norm because every image the sample number(aka ture batchsize) is unknown
         
         optimizer.zero_grad()
         loss.backward() 
@@ -126,6 +128,7 @@ for epoch in range(num_epochs):
     if epoch%print_iter_acc ==0:
         model.eval() 
         val_accuracy = []
+        num_legal_sample_v = 0
         
         for (data, img_name) in val_loader: 
 
@@ -133,6 +136,8 @@ for epoch in range(num_epochs):
             bboxes = test_set.label_dict[img_name[0]][1]
 
             _,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample)
+            pos_index_v = where(label==1)[0]
+            num_legal_sample_v = num_legal_sample_v + 2*len(pos_index_v)
             
             _,sco =  model(data)
             sco = sco.squeeze(0)
@@ -142,9 +147,9 @@ for epoch in range(num_epochs):
             accuracies = accurate_count(sco, label) 
             val_accuracy.append(accuracies)
             
-        train_r = (sum([tup[0] for tup in train_accuracy]), sum([num_sample for tup in train_accuracy]))
+        train_r = (sum([tup[0] for tup in train_accuracy]), num_legal_sample)
 
-        val_r = (sum([tup[0] for tup in val_accuracy]), sum([num_sample for tup in val_accuracy]))
+        val_r = (sum([tup[0] for tup in val_accuracy]), num_legal_sample_v)
         
         train_acc_r = 100. * train_r[0] / train_r[1]
         val_acc_r = 100. * val_r[0] / val_r[1]
@@ -160,6 +165,8 @@ for epoch in range(num_epochs):
         err_record.append((100 - train_acc_r.cpu(), 100 - val_acc_r.cpu()))
 
         train_accuracy = [] # clean the history
+        num_legal_sample = 0
+        num_legal_sample_v = 0
 
     schedule.step()
 
