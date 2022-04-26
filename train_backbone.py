@@ -16,7 +16,7 @@ img_size =256
 print_iter_loss = 200 # after 'print_iter_loss' batch print a loss log
 print_iter_acc = 2 # after 'print_iter_acc' epoch print a acc log
 
-num_backboneblock = 8 
+num_backboneblock = 2 
 num_anchor = 9 
 num_joint = 16
 

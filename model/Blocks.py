@@ -44,8 +44,8 @@ class TransposeBlock(nn.Module):
         super().__init__()
         self.channel_num = channel_num
 
-        self.transconv = nn.ConvTranspose2d(self.channel_num,int(self.channel_num/2),kernel_size=4,stride=2)
-        self.bn = nn.BatchNorm2d(self.channel_num)
+        self.transconv = nn.ConvTranspose2d(self.channel_num,int(self.channel_num/2),kernel_size=4,stride=2,padding=1)
+        self.bn = nn.BatchNorm2d(int(self.channel_num/2))
         self.lu = nn.LeakyReLU(0.1) 
 
     def forward(self,x):

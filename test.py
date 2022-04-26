@@ -4,9 +4,12 @@ from utils.tools import anchor_create
 from PIL import Image
 import matplotlib.pyplot as plt
 
-x = Parser(img_size=512,img_path="D:/MPII_dataset/images")
+img_size = 256
+x = Parser(img_size=img_size,img_path="D:/MPII_dataset/images")
+print('done')
 d = DataLoader(x,batch_size=1,shuffle=True)
-a,index = anchor_create(512,8,16)
+print('done')
+a,index = anchor_create(img_size,8,16)
 
 for id,(data,img_name) in enumerate(d):
 
@@ -16,17 +19,22 @@ for id,(data,img_name) in enumerate(d):
     print(img_name)
     
     img = Image.open("D:/MPII_dataset/images/"+img_name)
-    plt.imshow(img.resize((512,512)))
+    plt.imshow(img.resize((img_size,img_size)))
 
     ax = plt.gca()
     
-    dic = x.label_dict[img_name][1]
+    dic1 = x.label_dict[img_name][0]
+    dic2 = x.label_dict[img_name][1]
 
-    for i in range(len(dic)):
-        xmin = dic[i][0]
-        ymin = dic[i][1]
-        w = dic[i][2]-xmin
-        h = dic[i][3]-ymin
+    for i in range(len(dic1)):
+        for j in range(16):
+            plt.scatter(dic1[i][j][0],dic1[i][j][1],s=25,color='green')
+
+    for i in range(len(dic2)):
+        xmin = dic2[i][0]
+        ymin = dic2[i][1]
+        w = dic2[i][2]-xmin
+        h = dic2[i][3]-ymin
         ax.add_patch(plt.Rectangle((xmin,ymin),w,h,color="red",fill=False))
 
     for i in range(16):

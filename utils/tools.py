@@ -319,6 +319,10 @@ def proposal_create(anchor,shift,score,img_size,train=False,nms_thresh=0.7,n_tra
 
         return roi
 
+def heatmap_create(joint):
+    pass
+
+
 def poses_draw(imgs, num_rows, num_cols, titles=None, scale=1.5):  
 
     figsize = (num_cols * scale, num_rows * scale)

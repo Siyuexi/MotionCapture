@@ -1,6 +1,6 @@
 # train
 
-from torchvision import transforms,datasets
+import time
 from torch import device,cuda,nn,optim,no_grad,tensor,set_printoptions
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -13,19 +13,19 @@ from utils.Parser import Parser
 
 num_epochs = 16
 batch_size = 1 # for rpn training, batch_size fixed at 1
-img_size =512
+img_size =256
 
 print_iter_loss = 200 # after 'print_iter_loss' batch print a loss log
 print_iter_acc = 2 # after 'print_iter_acc' epoch print a acc log
  
 num_sample = 256 # rpn sample number
-num_backboneblock = 8 
-num_anchor = 16
+num_backboneblock = 2 
+num_anchor = 9
 num_joint = 16
 lambda_cls = 1 # weight of classification loss
-lambda_loc = 0 # weight of localization loss
+lambda_loc = 1 # weight of localization loss
 
-model_name = "segmentor-pretrain"
+model_name = "segmentor-batchnorm"
 log = open('log/'+model_name+'.txt','wt')
 
 print("loading training dataset")
@@ -65,7 +65,7 @@ optimizer = optim.SGD(model.parameters(),lr=1e-4,momentum=0.9)
 # optimizer = optim.Adam(model.parameters(),lr=5e-4)
 schedule = optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda iter: 0.9*iter)
 
-# model,optimizer = selective_load(model,optimizer,"weights/extractor-pretrain-epoch-final.pth")
+# model,optimizer = selective_load(model,optimizer,"weights/segmentor-batchnorm-epoch-0.pth")
  #model,optimizer = selective_load(model,optimizer,"weights/"+model_name+'-epoch-'+"4"+".pth")
 
 err_record = []
@@ -93,7 +93,7 @@ for epoch in range(num_epochs):
         num_legal_sample = num_legal_sample + 2*len(pos_index)
 
         model.train()
-        
+
         loc,sco =  model(data)
         loc = loc.squeeze(0)
         sco = sco.squeeze(0)
@@ -104,7 +104,7 @@ for epoch in range(num_epochs):
         loss_cls = criterion_cls(sco, label) 
         loss_loc = criterion_loc(loc[pos_index], shift[pos_index])
         loss = lambda_cls*loss_cls + lambda_loc*loss_loc
-        # loss = loss/len(pos_index) # loss batch norm because every image the sample number(aka ture batchsize) is unknown
+        loss = loss/len(pos_index) # loss batch norm because every image the sample number(aka ture batchsize) is unknown
         
         optimizer.zero_grad()
         loss.backward() 
