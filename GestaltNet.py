@@ -8,7 +8,7 @@ from model.Generator import Generator
 from model.Segmentor import Segmentor
 
 class GestaltNet(nn.Module):
-    def __init__(self,img_size,num_backboneblocks=8,joint_params=16,anchor_params=9) -> None: # num_backboneblocks >= 2
+    def __init__(self,img_size,num_backboneblocks=2,joint_params=16,anchor_params=9) -> None: # num_backboneblocks >= 2
         super().__init__()
         self.img_size = img_size
         self.num_backboneblocks = num_backboneblocks

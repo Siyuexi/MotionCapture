@@ -6,7 +6,7 @@ from GestaltNet import GestaltNet
 
 
 class ExtractNet(GestaltNet):
-    def __init__(self,img_size,num_backboneblocks=8,joint_params=16,anchor_params=9) -> None:
+    def __init__(self,img_size,num_backboneblocks=2,joint_params=16,anchor_params=9) -> None:
         super().__init__(img_size,num_backboneblocks,joint_params,anchor_params)
         self.avgpooling = nn.AdaptiveAvgPool2d((1,1))
         self.fc = nn.Linear(64,10)
@@ -20,7 +20,7 @@ class ExtractNet(GestaltNet):
 
 
 class GeneratNet(GestaltNet):
-    def __init__(self,img_size,num_backboneblocks=8,joint_params=16,anchor_params=9) -> None:
+    def __init__(self,img_size,num_backboneblocks=2,joint_params=16,anchor_params=9) -> None:
         super().__init__(img_size,num_backboneblocks,joint_params,anchor_params)
 
     def forward(self,x):
@@ -32,7 +32,7 @@ class GeneratNet(GestaltNet):
 
 
 class SegmentNet(GestaltNet):
-    def __init__(self,img_size,num_backboneblocks=8,joint_params=16,anchor_params=9) -> None:
+    def __init__(self,img_size,num_backboneblocks=2,joint_params=16,anchor_params=9) -> None:
         super().__init__(img_size,num_backboneblocks,joint_params,anchor_params)
 
     def forward(self,x):

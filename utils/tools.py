@@ -136,7 +136,7 @@ def anchor_create(img_size,num_backboneblocks,anchor_params): # anchor_params ==
     # type of anchor coordinates : Numpy (not Tensor)
     
     def _generate_base():   #  generate a basic anchor (and all other anchors can be generated from the shift of the base)
-        base_size = 2**int(num_backboneblocks/2) # 1 feature pixel = 'base_size' origin pixels
+        base_size = 2**int(num_backboneblocks) # 1 feature pixel = 'base_size' origin pixels
         if anchor_params == 9:
             scales = [8,16,36]
             ratios = [0.5,1,2]
@@ -167,7 +167,7 @@ def anchor_create(img_size,num_backboneblocks,anchor_params): # anchor_params ==
         return base_anchor
 
     def _generate_shift(): # ...on origin image scale
-        stride = 2**int(num_backboneblocks/2) 
+        stride = 2**int(num_backboneblocks) 
         shift_y = np.arange(0,img_size,stride)
         shift_x = np.arange(0,img_size,stride)
         # shift_x and shift y all equal to [0,16,32,...]

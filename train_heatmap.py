@@ -7,7 +7,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import sys
 from numpy import where
 
-from utils.examples import SegmentNet
+from utils.examples import GeneratNet
 from utils.tools import IoU_calculate, accurate_count,selective_load,complete_save,learning_draw,anchor_create,sample_create,bbox_calculate
 from utils.Parser import Parser
 
@@ -25,7 +25,7 @@ num_joint = 16
 lambda_cls = 1 # weight of classification loss
 lambda_loc = 1 # weight of localization loss
 
-model_name = "segmentor-batchnorm"
+model_name = "generator-pretrain"
 log = open('log/'+model_name+'.txt','wt')
 
 print("loading training dataset")
@@ -54,8 +54,9 @@ device = device("cuda" if cuda.is_available() else "cpu")
 print("device : "+str(device),file=log,flush=True)
 print("device : "+str(device),file=sys.stdout)
 
-model = SegmentNet(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor,joint_params=num_joint)
+model = GeneratNet(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor,joint_params=num_joint)
 # print(model)
+device = 'cpu'
 model = model.to(device)
 
 best_model_wts = model.state_dict()
@@ -71,8 +72,7 @@ schedule = optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda iter: 0.9*iter
 err_record = []
 best_acc_r = 1
 
-anchor = model.anchor
-anchor_index = model.legal_index
+anchor,anchor_index = anchor_create(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor)
 
 for epoch in range(num_epochs):
 
@@ -83,19 +83,16 @@ for epoch in range(num_epochs):
 
         # bacht size can only be 1 in rpn training
         data = data.to(device)
-        bboxes = train_set.label_dict[img_name[0]][1]
-
-        shift,label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample,posi_thresh=0.7,nega_thresh=0.3)
-        # print(shift.shape)
-        # print(label.shape)
-
-
-        pos_index = where(label==1)[0]
-        num_legal_sample = num_legal_sample + 2*len(pos_index)
-
+        joints = train_set.label_dict[img_name[0]][0]
+        print(joints)
         model.train()
+        toc1 = time.time()
+        heatmap =  model(data)
+        toc2 = time.time()
+        print(heatmap.shape)
+        print("time:"+str(toc2-toc1))
+        exit()
 
-        loc,sco =  model(data)
         loc = loc.squeeze(0)
         sco = sco.squeeze(0)
 

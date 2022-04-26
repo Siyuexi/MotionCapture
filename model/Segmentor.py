@@ -10,9 +10,9 @@ class Segmentor(nn.Module):
         self.num_backboneblocks = num_backboneblocks
         self.anchor_params = anchor_params
 
-        self.blocks = BasicBlock(64*(2**(int(self.num_backboneblocks/2-1))))
-        self.classification = nn.Conv2d(64*(2**(int(self.num_backboneblocks/2-1))),2*self.anchor_params,kernel_size=1,stride=1,padding=0) # foreground or background
-        self.regression = nn.Conv2d(64*(2**(int(self.num_backboneblocks/2-1))),4*self.anchor_params,kernel_size=1,stride=1,padding=0) # bbox shift of anchor
+        self.blocks = BasicBlock(64*(2**(self.num_backboneblocks-1)))
+        self.classification = nn.Conv2d(64*(2**(self.num_backboneblocks-1)),2*self.anchor_params,kernel_size=1,stride=1,padding=0) # foreground or background
+        self.regression = nn.Conv2d(64*(2**(self.num_backboneblocks-1)),4*self.anchor_params,kernel_size=1,stride=1,padding=0) # bbox shift of anchor
 
         # weight init
         nn.init.normal_(self.classification.weight,mean=0,std=1)
