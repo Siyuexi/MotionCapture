@@ -11,7 +11,7 @@ from utils.tools import accurate_count,selective_load,complete_save,learning_dra
 
 num_epochs = 16
 batch_size = 16
-img_size =256
+img_size = 128
 
 print_iter_loss = 200 # after 'print_iter_loss' batch print a loss log
 print_iter_acc = 2 # after 'print_iter_acc' epoch print a acc log
