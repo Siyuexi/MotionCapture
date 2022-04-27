@@ -396,7 +396,7 @@ def label_create(joint,img_size,joint_params,sigma=16): #
 
     return label
 
-def criterion_key(pred,label,target):
+def criterion_key(pred,label,target,device='cpu'):
     loss = 0
     for i in range(len(label)):
         xmin = int(target[i,0])
@@ -404,7 +404,7 @@ def criterion_key(pred,label,target):
         xmax = int(target[i,2])
         ymax = int(target[i,3])
 
-        sub = torch.tensor(label[i,xmin:xmax,ymin:ymax])-pred[xmin:xmax,ymin:ymax]
+        sub = torch.tensor(label[i,xmin:xmax,ymin:ymax]).to(device)-pred[xmin:xmax,ymin:ymax]
         loss = loss + torch.sum(torch.mul(sub,sub))
         # print(sub)
     return loss

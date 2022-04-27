@@ -57,7 +57,6 @@ print("device : "+str(device),file=sys.stdout)
 
 model = GestaltNet(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor,joint_params=num_joint)
 # print(model)
-device = 'cpu'
 model = model.to(device)
 
 best_model_wts = model.state_dict()
@@ -105,7 +104,7 @@ for epoch in range(num_epochs):
 
         loss_cls = criterion_cls(score, bbox_label) 
         loss_loc = criterion_loc(shift[pos_index], bbox_bias[pos_index])
-        loss_key = criterion_key(heatmap,joint_label,target)
+        loss_key = criterion_key(heatmap,joint_label,target,device=device)
         loss = (lambda_cls*loss_cls + lambda_loc*loss_loc)/len(pos_index) + (lambda_key*loss_key)/len(target) # loss batch norm because every image the sample number(aka ture batchsize) is unknown
         
         optimizer.zero_grad()
