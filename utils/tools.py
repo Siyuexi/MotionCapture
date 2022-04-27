@@ -398,6 +398,7 @@ def label_create(joint,img_size,joint_params,sigma=16): #
 
 def criterion_key(pred,label,target,device='cpu'):
     loss = 0
+    pred = pred*len(target)
     for i in range(len(label)):
         xmin = int(target[i,0])
         ymin = int(target[i,1])
