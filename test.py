@@ -4,12 +4,12 @@ from utils.tools import anchor_create
 from PIL import Image
 import matplotlib.pyplot as plt
 
-img_size = 128
+img_size = 224
 x = Parser(img_size=img_size,img_path="D:/MPII_dataset/images")
 print('done')
 d = DataLoader(x,batch_size=1,shuffle=True)
 print('done')
-a,index = anchor_create(img_size,2,9)
+a,index = anchor_create(img_size,3,9)
 print(a)
 
 for id,(data,img_name) in enumerate(d):

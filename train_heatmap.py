@@ -7,8 +7,8 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import sys
 from numpy import where
 
-from utils.examples import GeneratNet
-from utils.tools import IoU_calculate, accurate_count,selective_load,complete_save,learning_draw,anchor_create,sample_create,bbox_calculate
+from GestaltNet import  GestaltNet
+from utils.tools import IoU_calculate, accurate_count, label_create,selective_load,complete_save,learning_draw,anchor_create,sample_create,target_create,criterion_key
 from utils.Parser import Parser
 
 num_epochs = 16
@@ -18,14 +18,15 @@ img_size = 128
 print_iter_loss = 200 # after 'print_iter_loss' batch print a loss log
 print_iter_acc = 2 # after 'print_iter_acc' epoch print a acc log
  
-num_sample = 256 # rpn sample number
+num_sample = 10 # rpn sample number
 num_backboneblock = 2 
 num_anchor = 9
 num_joint = 16
 lambda_cls = 1 # weight of classification loss
 lambda_loc = 1 # weight of localization loss
+lambda_key = 1 # weight of keypoint loss
 
-model_name = "generator-pretrain"
+model_name = "GestaltNet"
 log = open('log/'+model_name+'.txt','wt')
 
 print("loading training dataset")
@@ -54,7 +55,7 @@ device = device("cuda" if cuda.is_available() else "cpu")
 print("device : "+str(device),file=log,flush=True)
 print("device : "+str(device),file=sys.stdout)
 
-model = GeneratNet(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor,joint_params=num_joint)
+model = GestaltNet(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor,joint_params=num_joint)
 # print(model)
 device = 'cpu'
 model = model.to(device)
@@ -84,41 +85,45 @@ for epoch in range(num_epochs):
         # bacht size can only be 1 in rpn training
         data = data.to(device)
         joints = train_set.label_dict[img_name[0]][0]
-        print(joints)
+        bboxes = train_set.label_dict[img_name[0]][1]
+
         model.train()
-        toc1 = time.time()
-        heatmap =  model(data)
-        toc2 = time.time()
-        print(heatmap.shape)
-        print("time:"+str(toc2-toc1))
-        exit()
 
-        loc = loc.squeeze(0)
-        sco = sco.squeeze(0)
+        bbox_bias,bbox_label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample,posi_thresh=0.7,nega_thresh=0.3)
 
-        shift = tensor(shift).to(device)
-        label = tensor(label).to(device)
+        pos_index = where(bbox_label==1)[0]
+        num_legal_sample = num_legal_sample + 2*len(pos_index)
 
-        loss_cls = criterion_cls(sco, label) 
-        loss_loc = criterion_loc(loc[pos_index], shift[pos_index])
-        loss = lambda_cls*loss_cls + lambda_loc*loss_loc
-        loss = loss/len(pos_index) # loss batch norm because every image the sample number(aka ture batchsize) is unknown
+        heatmap,shift,score,roi =  model(data)
+
+        target = target_create(roi,bboxes)
+
+        joint_label = label_create(joints,img_size,num_joint)
+
+        bbox_bias = tensor(bbox_bias).to(device)
+        bbox_label = tensor(bbox_label).to(device)
+
+        loss_cls = criterion_cls(score, bbox_label) 
+        loss_loc = criterion_loc(shift[pos_index], bbox_bias[pos_index])
+        loss_key = criterion_key(heatmap,joint_label,target)
+        loss = (lambda_cls*loss_cls + lambda_loc*loss_loc)/len(pos_index) + (lambda_key*loss_key)/len(target) # loss batch norm because every image the sample number(aka ture batchsize) is unknown
         
         optimizer.zero_grad()
         loss.backward() 
         optimizer.step()
         
-        accuracies = accurate_count(sco, label)
+        accuracies = accurate_count(score, bbox_label)
         train_accuracy.append(accuracies) 
         
         if batch_id%print_iter_loss ==0: 
             
-            checkpoint = 'Epoch [{}/{}]\tBatch [{}/{}]\tSample [{}/{}]\tClsLoss: {:.6f}\tLocLoss: {:.6f}'.format(
+            checkpoint = 'Epoch [{}/{}]\tBatch [{}/{}]\tSample [{}/{}]\tClsLoss: {:.6f}\tLocLoss: {:.6f}\tKeyLoss: {:.6f}'.format(
                 epoch+1,num_epochs,
                 min(batch_id+print_iter_loss,train_size//batch_size),train_size//batch_size,
                 min((batch_id+print_iter_loss) * batch_size,train_size), train_size,
                 lambda_cls*loss_cls.item(),
-                lambda_loc*loss_loc.item()
+                lambda_loc*loss_loc.item(),
+                lambda_key*loss_key.item()
                 )
             print(checkpoint,file=log,flush=True)
             print(checkpoint,file=sys.stdout)
@@ -137,12 +142,11 @@ for epoch in range(num_epochs):
             pos_index_v = where(label==1)[0]
             num_legal_sample_v = num_legal_sample_v + 2*len(pos_index_v)
             
-            _,sco =  model(data)
-            sco = sco.squeeze(0)
+            _,_,score,_ =  model(data)
 
             label = tensor(label).to(device)
 
-            accuracies = accurate_count(sco, label) 
+            accuracies = accurate_count(score, label) 
             val_accuracy.append(accuracies)
             
         train_r = (sum([tup[0] for tup in train_accuracy]), num_legal_sample)

@@ -4,6 +4,7 @@ from torch import load,save,max,min, tensor,zeros,is_tensor,from_numpy,exp,stack
 from torchvision.ops import nms
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 def selective_load(model,optimizer,checkpoint_path,need_optim=False):
     model_state_dict = model.state_dict()
@@ -89,17 +90,17 @@ def bbox_calculate(anchor,shift): # for bbox prediction // type == torch.tensor
     ay = anchor[:,1] + 0.5*ah
 
     # shift:[dx,dy,dw,dh]
-    bx = ax + aw*shift[:,0]
-    by = ay + ah*shift[:,1]
-    bw = aw*exp(shift[:,2])
-    bh = ah*exp(shift[:,3])
+    bx = ax + aw*shift[:,0].cpu().detach().numpy()
+    by = ay + ah*shift[:,1].cpu().detach().numpy()
+    bw = aw*np.exp(shift[:,2].cpu().detach().numpy())
+    bh = ah*np.exp(shift[:,3].cpu().detach().numpy())
 
     xmin = bx - 0.5*bw
     ymin = by - 0.5*bh
     xmax = bw + xmin
     ymax = bh + ymin
 
-    bbox = stack([xmin,ymin,xmax,ymax],dim=1)
+    bbox = np.vstack((xmin,ymin,xmax,ymax)).transpose()
 
     return bbox
 
@@ -282,7 +283,7 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
     return shift, label
 
 def proposal_create(anchor,shift,score,img_size,train=False,nms_thresh=0.7,n_train_pre_nms=12000
-    ,n_train_post_nms=2000, n_test_pre_nms=6000, n_test_post_nms=300, min_size=16,device='cpu'): # create RoIs for Generator
+    ,n_train_post_nms=2000, n_test_pre_nms=6000, n_test_post_nms=300, min_size=16): # create RoIs for Generator
         
         if train:
             n_pre_nms = n_train_pre_nms
@@ -292,35 +293,121 @@ def proposal_create(anchor,shift,score,img_size,train=False,nms_thresh=0.7,n_tra
             n_post_nms = n_test_post_nms
 
         roi = bbox_calculate(anchor, shift)
+        # print(roi)
+        # print("roi:"+str(roi.shape))
 
         roi[:, slice(0, 4, 2)] = np.clip(
-            roi[:, slice(0, 4, 2)], 0, img_size[0])
+            roi[:, slice(0, 4, 2)], 0, img_size)
         roi[:, slice(1, 4, 2)] = np.clip(
-            roi[:, slice(1, 4, 2)], 0, img_size[1])
+            roi[:, slice(1, 4, 2)], 0, img_size)
+        # print(roi)
+        # print(roi.shape)
 
         hs = roi[:, 2] - roi[:, 0]
         ws = roi[:, 3] - roi[:, 1]
 
         keep = np.where((hs >= min_size) & (ws >= min_size))[0]
+        # print(keep)
+        # print(keep.shape)
+
         roi = roi[keep, :]
+        # print(roi)
+        # print(roi.shape)
+        # print(score)
+        # print(score.shape)
+
         score = score[keep]
 
+        # print('score'+str(score))
+        # print(score.shape)
+
+        score = score.cpu().detach().numpy()
         order = score.ravel().argsort()[::-1]
+
+        # print(order)
+        # print(order.shape)
 
         if n_pre_nms > 0:
             order = order[:n_pre_nms]
+
+        # print(order)
+        # print(order.shape)
+
         roi = roi[order, :]
         score = score[order]
 
-        keep = nms(from_numpy(roi).to(device), from_numpy(score).to(device), nms_thresh)
+        keep = nms(from_numpy(roi), from_numpy(score), nms_thresh)
         if n_post_nms > 0:
             keep = keep[:n_post_nms]
         roi = roi[keep.cpu().numpy()]
-
         return roi
 
-def heatmap_create(joint):
-    pass
+def target_create(roi,gt):
+
+    len_roi = roi.shape[0]
+    len_bbox = len(gt)  
+    ious = np.empty((len_roi,len_bbox))  
+    for i in range(len_roi):
+        for j in range(len_bbox):
+            ious[i,j] = IoU_calculate(roi[i],gt[j],type=-1)
+
+    roi_index = ious.argmax(axis=0) # for every gt, find the biggest iou roi's index
+    target = roi[roi_index]
+
+    return target
+
+def label_create(joint,img_size,joint_params,sigma=16): #
+    label = np.empty([len(joint),joint_params,img_size,img_size])
+    # print(label.shape)
+    for i in range(len(joint)):
+        for j in range(joint_params):
+            x1 = np.linspace(1,img_size,img_size)
+            y1 = np.linspace(1,img_size,img_size)
+            [x,y] = np.meshgrid(x1,y1)
+            x = x - joint[i][j][0]
+            y = y - joint[i][j][1]
+            d2 = x*x + y*y
+            e2 = 2.0*sigma*sigma
+            exponent = d2/e2
+            label[i,j,:,:] = np.exp(-exponent)
+
+    # # label testing
+    # import matplotlib.pyplot as plt
+    # from mpl_toolkits.mplot3d import Axes3D
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection="3d")
+
+    # x = np.arange(0,img_size)
+    # y = np.arange(0,img_size)
+    # x,y = np.meshgrid(x, y)
+
+
+    # ax.plot_surface(x,y,label[0][0])
+    # ax.set_xlabel("X Label")
+    # ax.set_ylabel("Y Label")
+    # ax.set_zlabel("Z Label")
+
+    # ax.set_title("3D surface plot")
+    # plt.show()
+    # print(np.max(label[0][0]))
+    # print(np.argmax(label[0][0]))
+    # print(label[0][0])
+
+    return label
+
+def criterion_key(pred,label,target):
+    loss = 0
+    for i in range(len(label)):
+        xmin = int(target[i,0])
+        ymin = int(target[i,1])
+        xmax = int(target[i,2])
+        ymax = int(target[i,3])
+
+        sub = torch.tensor(label[i,xmin:xmax,ymin:ymax])-pred[xmin:xmax,ymin:ymax]
+        loss = loss + torch.sum(torch.mul(sub,sub))
+        # print(sub)
+    return loss
 
 
 def poses_draw(imgs, num_rows, num_cols, titles=None, scale=1.5):  
