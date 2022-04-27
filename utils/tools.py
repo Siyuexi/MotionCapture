@@ -405,7 +405,13 @@ def criterion_key(pred,label,target,device='cpu'):
         xmax = int(target[i,2])
         ymax = int(target[i,3])
 
-        sub = torch.tensor(label[i,xmin:xmax,ymin:ymax]).to(device)-pred[xmin:xmax,ymin:ymax]
+        # print(xmin,ymin,xmax,ymax)
+        # print(label.shape)
+        # print("label:"+str(label[i,:,xmin:xmax,ymin:ymax]))
+        # print(pred.shape)
+        # print("pred:"+str(pred[:,xmin:xmax,ymin:ymax]))
+
+        sub = torch.tensor(label[i,:,xmin:xmax,ymin:ymax]).to(device)-pred[:,xmin:xmax,ymin:ymax]
         loss = loss + torch.sum(torch.mul(sub,sub))
         # print(sub)
     return loss
