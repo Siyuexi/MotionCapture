@@ -370,6 +370,7 @@ def label_create(joint,img_size,joint_params,sigma=16): #
             e2 = 2.0*sigma*sigma
             exponent = d2/e2
             label[i,j,:,:] = np.exp(-exponent)
+            label[i,j,:,:] = label[i,j,:,:]/np.sum(label[i,j,:,:])
 
     # # label testing
     # import matplotlib.pyplot as plt
