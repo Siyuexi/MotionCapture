@@ -351,10 +351,9 @@ def target_create(roi,gt):
         for j in range(len_bbox):
             ious[i,j] = IoU_calculate(roi[i],gt[j],type=-1)
 
-    roi_index = ious.argmax(axis=0) # for every gt, find the biggest iou roi's index
-    target = roi[roi_index]
+    target_index = ious.argmax(axis=1) # for every roi, find the biggest iou gt's index
 
-    return target
+    return target_index
 
 def label_create(joint,img_size,joint_params,sigma=16): #
     label = np.empty([len(joint),joint_params,img_size,img_size])
@@ -370,7 +369,7 @@ def label_create(joint,img_size,joint_params,sigma=16): #
             e2 = 2.0*sigma*sigma
             exponent = d2/e2
             label[i,j,:,:] = np.exp(-exponent)
-            label[i,j,:,:] = label[i,j,:,:]/np.sum(label[i,j,:,:])
+            # label[i,j,:,:] = label[i,j,:,:]/np.sum(label[i,j,:,:])
 
     # # label testing
     # import matplotlib.pyplot as plt
@@ -397,14 +396,13 @@ def label_create(joint,img_size,joint_params,sigma=16): #
 
     return label
 
-def criterion_key(pred,label,target,device='cpu'):
+def criterion_key(pred,label,roi,target,img_size,device='cpu'):
     loss = 0
-    pred = pred*len(target)
-    for i in range(len(label)):
-        xmin = int(target[i,0])
-        ymin = int(target[i,1])
-        xmax = int(target[i,2])
-        ymax = int(target[i,3])
+    for i in range(len(roi)):
+        xmin = int(roi[i,0])
+        ymin = int(roi[i,1])
+        xmax = int(roi[i,2])
+        ymax = int(roi[i,3])
 
         # print(xmin,ymin,xmax,ymax)
         # print(label.shape)
@@ -412,10 +410,10 @@ def criterion_key(pred,label,target,device='cpu'):
         # print(pred.shape)
         # print("pred:"+str(pred[:,xmin:xmax,ymin:ymax]))
 
-        sub = torch.tensor(label[i,:,xmin:xmax,ymin:ymax]).to(device)-pred[:,xmin:xmax,ymin:ymax]
+        sub = torch.tensor(label[target[i],:,xmin:xmax,ymin:ymax]).to(device)-pred[:,xmin:xmax,ymin:ymax]
         loss = loss + torch.sum(torch.mul(sub,sub))
         # print(sub)
-    return loss
+    return loss/(img_size*img_size)
 
 
 def poses_draw(imgs, num_rows, num_cols, titles=None, scale=1.5):  

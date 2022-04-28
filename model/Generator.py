@@ -1,7 +1,7 @@
 # Simple Baseline
 
 import torch.nn as nn
-from torch import argmax
+from torch import sigmoid
 from model.Blocks import TransposeBlock,BasicBlock
 
 class Generator(nn.Module):
@@ -22,10 +22,11 @@ class Generator(nn.Module):
         for i in range(self.num_backboneblocks):
             x = self.transpose[i](x)
         x = self.estimation(x)
-        n,_,w,h = x.shape
+        # n,_,w,h = x.shape
         
-        prob = x.view(n,self.joint_params,w*h) # reshape to [batchsize,jointnumber,w*h]
-        prob = nn.functional.softmax(prob,dim=2) # calculate probability
-        prob = prob.view(n,self.joint_params,w,h)
+        # prob = x.view(n,self.joint_params,w*h) # reshape to [batchsize,jointnumber,w*h]
+        # prob = nn.functional.softmax(prob,dim=2) # calculate probability
+        # prob = prob.view(n,self.joint_params,w,h)
+        prob = sigmoid(x)
         return prob
         
