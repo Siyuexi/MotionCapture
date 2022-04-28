@@ -11,6 +11,9 @@ from GestaltNet import  GestaltNet
 from utils.tools import IoU_calculate, accurate_count, label_create,selective_load,complete_save,learning_draw,anchor_create,sample_create,target_create,criterion_key
 from utils.Parser import Parser
 
+joint_list = [0,5,6,7,9,10,15] # for 7 joint training
+# joint_list = [0,2,3,5,12,13,9,10,15] # for 9 joint training
+
 num_epochs = 16
 batch_size = 1 # for rpn training, batch_size fixed at 1
 img_size = 128
@@ -21,7 +24,7 @@ print_iter_acc = 2 # after 'print_iter_acc' epoch print a acc log
 num_sample = 10 # rpn sample number
 num_backboneblock = 2 
 num_anchor = 9
-num_joint = 16
+num_joint = 7
 lambda_cls = 1 # weight of classification loss
 lambda_loc = 1 # weight of localization loss
 lambda_key = 1 # weight of keypoint loss
@@ -86,6 +89,9 @@ for epoch in range(num_epochs):
         joints = train_set.label_dict[img_name[0]][0]
         bboxes = train_set.label_dict[img_name[0]][1]
 
+        for i in range(len(joints)):
+            joints[i] = joints[i][joint_list]
+
         model.train()
 
         bbox_bias,bbox_label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample,posi_thresh=0.7,nega_thresh=0.3)
@@ -106,7 +112,7 @@ for epoch in range(num_epochs):
         loss_loc = criterion_loc(shift[pos_index], bbox_bias[pos_index])
         loss_key = criterion_key(heatmap,joint_label,roi,target,img_size,device=device)
         loss = (lambda_cls*loss_cls + lambda_loc*loss_loc)/len(pos_index) + (lambda_key*loss_key)/len(target) # loss batch norm because every image the sample number(aka ture batchsize) is unknown
-        
+
         optimizer.zero_grad()
         loss.backward() 
         optimizer.step()

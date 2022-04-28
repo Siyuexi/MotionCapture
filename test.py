@@ -12,7 +12,7 @@ from GestaltNetMobile import *
 model = torch.load("GestaltNet-128-2-model.pt")
 print('done')
 img_size = 128
-x = Parser(img_size=img_size,img_path="D:/MPII_dataset/images")
+x = Parser(img_size=img_size,img_path="D:/MPII_dataset/images",type='valid')
 print('done')
 d = DataLoader(x,batch_size=1,shuffle=True)
 print('done')
@@ -38,9 +38,9 @@ for id,(data,img_name) in enumerate(d):
     dic1 = x.label_dict[img_name][0]
     dic2 = x.label_dict[img_name][1]
 
-    # for i in range(len(dic1)):
-    #     for j in range(16):
-    #         plt.scatter(dic1[i][j][0],dic1[i][j][1],s=25,color='green')
+    for i in range(len(dic1)):
+        for j in range(16):
+            plt.scatter(dic1[i][j][0],dic1[i][j][1],s=25,color='purple')
     for i in range(16):
         plt.scatter(joints[i][0].item(),joints[i][1].item(),s=25,color='green')
 
