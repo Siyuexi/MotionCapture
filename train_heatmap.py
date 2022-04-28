@@ -29,7 +29,7 @@ lambda_cls = 1 # weight of classification loss
 lambda_loc = 1 # weight of localization loss
 lambda_key = 1 # weight of keypoint loss
 
-model_name = "GestaltNet"
+model_name = "GestaltNet-joint7"
 log = open('log/'+model_name+'.txt','wt')
 
 print("loading training dataset")
@@ -89,7 +89,7 @@ for epoch in range(num_epochs):
         joints = train_set.label_dict[img_name[0]][0]
         bboxes = train_set.label_dict[img_name[0]][1]
         
-        if(len(joints[0])!=16): # strip abnormal sample
+        if(epoch==0 and len(joints[0])!=16): # strip abnormal sample
             continue
             
         for i in range(len(joints)):
