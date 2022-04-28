@@ -74,6 +74,7 @@ schedule = optim.lr_scheduler.LambdaLR(optimizer,lr_lambda=lambda iter: 0.9*iter
 
 err_record = []
 best_acc_r = 1
+abandon_list = []
 
 anchor,anchor_index = anchor_create(img_size,num_backboneblocks=num_backboneblock,anchor_params=num_anchor)
 
@@ -89,11 +90,15 @@ for epoch in range(num_epochs):
         joints = train_set.label_dict[img_name[0]][0]
         bboxes = train_set.label_dict[img_name[0]][1]
         
-        if(epoch==0 and len(joints[0])!=16): # strip abnormal sample
-            continue
-            
-        for i in range(len(joints)):
-            joints[i] = joints[i][joint_list]
+        if(epoch==0): # strip abnormal sample
+            if(len(joints[0])!=16):
+                abandon_list.append(img_name)
+                continue
+            for i in range(len(joints)):
+                joints[i] = joints[i][joint_list]
+        else:
+            if img_name in abandon_list:
+                continue        
 
         model.train()
 
