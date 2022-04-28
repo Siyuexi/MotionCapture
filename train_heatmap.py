@@ -88,7 +88,10 @@ for epoch in range(num_epochs):
         data = data.to(device)
         joints = train_set.label_dict[img_name[0]][0]
         bboxes = train_set.label_dict[img_name[0]][1]
-
+        
+        if(len(joints[i])!=16): # strip abnormal sample
+            continue
+            
         for i in range(len(joints)):
             joints[i] = joints[i][joint_list]
 
