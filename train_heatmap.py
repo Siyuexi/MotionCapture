@@ -104,8 +104,8 @@ for epoch in range(num_epochs):
             if img_name in abandon_list:
                 continue        
 
-        # model.train()
-        model.eval()
+        model.train()
+        # model.eval()
 
         bbox_bias,bbox_label = sample_create(anchor,anchor_index,bboxes,num_sample=num_sample,posi_thresh=0.7,nega_thresh=0.3)
 
