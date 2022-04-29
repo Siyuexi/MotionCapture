@@ -104,7 +104,7 @@ def bbox_calculate(anchor,shift): # for bbox prediction // type == torch.tensor
 
     return bbox
 
-def IoU_calculate(box1,box2,threshold=0.5,type=0): # type==0:find those who >= threshold; type==1:find those who <=threshold;else do not calculate acc
+def IoU_calculate(box1,box2,threshold=0.5,type=-1): # type==0:find those who >= threshold; type==1:find those who <=threshold;else do not calculate acc
     b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3]
     b2_x1, b2_y1, b2_x2, b2_y2 = box2[0], box2[1], box2[2], box2[3]
 
@@ -124,12 +124,12 @@ def IoU_calculate(box1,box2,threshold=0.5,type=0): # type==0:find those who >= t
 
         iou = inter_area / (b1_area + b2_area - inter_area)
 
-    if(type==0):
-        num = np.sum(i >= threshold for i in iou)
-    elif(type==1):
-        num = np.sum(i <= threshold for i in iou)
-    else:
+    if type == -1:
         return iou
+    elif((type==0 and iou>=threshold) or (type==1 and iou<=threshold)):
+        num = 1
+    else:
+        num = 0
 
     return iou,num
 
@@ -282,17 +282,15 @@ def sample_create(anchor,index,gt,num_sample=256,posi_thresh=0.7,nega_thresh=0.3
     
     return shift, label
 
-def proposal_create(anchor,shift,score,img_size,train=False,nms_thresh=0.7,n_train_pre_nms=12000
-    ,n_train_post_nms=2000, n_test_pre_nms=6000, n_test_post_nms=300, min_size=16): # create RoIs for Generator
+def proposal_create(anchor,shift,score,img_size,train=False,nms_thresh=0.7,n_pre_nms=100,n_post_nms=10, min_size=16): # create RoIs for Generator
         
-        if train:
-            n_pre_nms = n_train_pre_nms
-            n_post_nms = n_train_post_nms
-        else:
-            n_pre_nms = n_test_pre_nms
-            n_post_nms = n_test_post_nms
-
         roi = bbox_calculate(anchor, shift)
+        # score = score.cpu().detach().numpy()
+        # roi = anchor
+        # print(len(anchor))
+        # roi = anchor[np.where(score>0.5)]
+        # print(len(roi))
+        # exit()
         # print(roi)
         # print("roi:"+str(roi.shape))
 

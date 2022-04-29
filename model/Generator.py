@@ -11,7 +11,7 @@ class Generator(nn.Module):
         self.joint_params = joint_params
 
         self.blocks = BasicBlock(64*(2**(self.num_backboneblocks-1)))
-        self.transpose = nn.ModuleList([TransposeBlock(64*(2**(self.num_backboneblocks-1)-i))for i in range(self.num_backboneblocks)])
+        self.transpose = nn.ModuleList([TransposeBlock(64*(2**(self.num_backboneblocks-1-i)))for i in range(self.num_backboneblocks)])
         self.estimation = nn.Conv2d(32,self.joint_params,kernel_size=1,stride=1,padding=0)
         
         # weight init
